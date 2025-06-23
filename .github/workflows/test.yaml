@@ -1,0 +1,20 @@
+name: code format for rust
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    name: code format
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: run format
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast
