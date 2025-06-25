@@ -2,7 +2,7 @@ name: code format for rust
 
 on:
   push:
-    files:
+    paths:
       - '**/*.rs'
 
 jobs:
@@ -15,6 +15,7 @@ jobs:
       - name: setup rust
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: stable
           override: true
           components: rustfmt
       - name: run format

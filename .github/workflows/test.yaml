@@ -1,4 +1,4 @@
-name: code format for rust
+name: code test
 
 on:
   push:
@@ -7,13 +7,13 @@ on:
       - main
 
 jobs:
-  format:
+  test:
     runs-on: ubuntu-latest
-    name: code format
+    name: test code
     steps:
       - name: checkout
         uses: actions/checkout@v4
-      - name: run format
+      - name: run test
         uses: actions-rs/cargo@v1
         with:
           command: test
