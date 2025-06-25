@@ -13,6 +13,17 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
+      - name: cache cargo target
+        uses: actions/cache@v4
+        with:
+          path: |
+            target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-
       - name: run test
         uses: actions-rs/cargo@v1
         with:
