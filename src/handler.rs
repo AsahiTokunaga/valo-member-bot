@@ -7,8 +7,8 @@ use serenity::model::gateway::Ready;
 
 mod pin;
 use pin::pin;
-mod question;
-use question::question;
+mod questions;
+use questions::questions;
 
 pub struct Handler;
 
@@ -29,8 +29,8 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, ctx: SerenityContext, interaction: Interaction) {
         if let Interaction::Component(component) = interaction {
-            println!("[ OK ] インタラクションを受信しました");
-            question(ctx, component)
+            println!("[ OK ] インタラクションを受信しました: {}", component.data.custom_id);
+            questions(ctx, component)
                 .await
                 .expect("[ FAILED ] インタラクションの処理に失敗しました");
         }

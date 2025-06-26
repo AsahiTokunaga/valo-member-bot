@@ -6,9 +6,9 @@ use redis::{AsyncCommands, Client};
 
 static VALKEY_CONNECTION: OnceCell<Mutex<ConnectionManager>> = OnceCell::const_new();
 
-pub struct ValkeyModules;
+pub struct Valkey;
 
-impl ValkeyModules {
+impl Valkey {
     async fn new(redis_pass: String) -> AnyhowResult<&'static Mutex<ConnectionManager>> {
         let client = Client::open(format!("redis://:{}@127.0.0.1/", redis_pass))
             .context("[ FAILED ] Redisのクライアントの作成に失敗しました")?;
@@ -42,7 +42,7 @@ impl ValkeyModules {
         Ok(())
     }
 
-    pub async fn _get(redis_pass: String, key: &str) -> AnyhowResult<Option<String>> {
+    pub async fn get(redis_pass: String, key: &str) -> AnyhowResult<Option<String>> {
         let mut connection = Self::new(redis_pass).await?.lock().await;
         let value: Option<String> = connection
             .get(key)
