@@ -1,11 +1,14 @@
 use serenity::async_trait;
 use serenity::client::Context as SerenityContext;
 use serenity::client::EventHandler;
+use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 
 mod pin;
 use pin::pin;
+mod questions;
+use questions::questions;
 
 pub struct Handler;
 
@@ -21,6 +24,15 @@ impl EventHandler for Handler {
             pin(ctx, &msg)
                 .await
                 .expect("[ FAILED ] 募集の作成に失敗しました");
+        }
+    }
+
+    async fn interaction_create(&self, ctx: SerenityContext, interaction: Interaction) {
+        if let Interaction::Component(component) = interaction {
+            println!("[ OK ] インタラクションを受信しました: {}", component.data.custom_id);
+            questions(ctx, component)
+                .await
+                .expect("[ FAILED ] インタラクションの処理に失敗しました");
         }
     }
 }
