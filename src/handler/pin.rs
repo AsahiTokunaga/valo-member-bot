@@ -25,14 +25,14 @@ pub async fn pin(ctx: SerenityContext, msg: &Message) -> AnyhowResult<()> {
     let res = msg.channel_id.send_message(&ctx.http, message).await?;
     let res_id = res.id.to_string();
 
-    Valkey::set(redis_pass, "latest", &res_id).await?;
+    Valkey::set(&redis_pass, "latest", &res_id).await?;
     Ok(())
 }
 
 async fn delete_latest(ctx: &SerenityContext) -> AnyhowResult<()> {
     let redis_pass =
         dotenv::var("REDIS_PASS").context("[ FAILED ] Redisのパスワードが設定されていません")?;
-    if let Some(latest_id) = Valkey::get(redis_pass, "latest")
+    if let Some(latest_id) = Valkey::get(&redis_pass, "latest")
         .await
         .context("[ FAILED ] Redisから最新のメッセージIDを取得できませんでした")?
     {

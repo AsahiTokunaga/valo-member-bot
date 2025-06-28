@@ -55,7 +55,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             }
         }
         "募集人数を選択" => {
-            let _user_id = component.user.id;
+            let user_id = component.user.id;
             let response = recruit_message().await;
             let party = if let ComponentInteractionDataKind::StringSelect { values } =
                 &component.data.kind
@@ -81,7 +81,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 _ => 5,
             };
             component.create_response(&ctx.http, response).await?;
-            if let Some(component) = ComponentHandler::get(_user_id).await {
+            if let Some(component) = ComponentHandler::get(user_id).await {
                 WebhookHandler::set_max_member(&component, max_member).await?;
             }
         }

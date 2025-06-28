@@ -13,7 +13,7 @@ async fn main() -> AnyhowResult<()> {
     dotenv().context("[ FAILED ] .envファイルの読み込みに失敗しました")?;
     let redis_pass =
         dotenv::var("REDIS_PASS").context("[ FAILED ] Redisのパスワードが設定されていません")?;
-    Valkey::ping(redis_pass).await?;
+    Valkey::ping(&redis_pass).await?;
     let token = dotenv::var("TOKEN").context("[ FAILED ] トークンが設定されていません")?;
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
     let mut client = SerenityClient::builder(&token, intents)
