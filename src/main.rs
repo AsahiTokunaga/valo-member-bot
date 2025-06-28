@@ -7,14 +7,14 @@ mod handler;
 use handler::Handler;
 mod valkey;
 use valkey::Valkey;
+mod dotenv_handler;
 
 #[tokio::main]
 async fn main() -> AnyhowResult<()> {
     dotenv().context("[ FAILED ] .envファイルの読み込みに失敗しました")?;
-    let redis_pass =
-        dotenv::var("REDIS_PASS").context("[ FAILED ] Redisのパスワードが設定されていません")?;
+    let redis_pass = dotenv_handler::get("REDIS_PASS").await?;
     Valkey::ping(&redis_pass).await?;
-    let token = dotenv::var("TOKEN").context("[ FAILED ] トークンが設定されていません")?;
+    let token = dotenv_handler::get("TOKEN").await?;
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
     let mut client = SerenityClient::builder(&token, intents)
         .event_handler(Handler)

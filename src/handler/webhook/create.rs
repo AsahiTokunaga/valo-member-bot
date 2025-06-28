@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use anyhow::{Context, Result as AnyhowResult};
+use anyhow::Result as AnyhowResult;
 use serenity::all::Builder;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateEmbed, CreateWebhook, ExecuteWebhook,
@@ -12,6 +12,7 @@ use serenity::model::application::ModalInteraction;
 use serenity::model::id::{ChannelId, EmojiId};
 use serenity::model::webhook::Webhook;
 
+use crate::dotenv_handler;
 use crate::handler::questions::component_handler::ComponentHandler;
 use crate::handler::webhook::WebhookHandler;
 use crate::valkey::Valkey;
@@ -19,7 +20,7 @@ use crate::valkey::Valkey;
 pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
     let user_id = modal.user.id;
     let channel_id_string =
-        dotenv::var("CHANNEL_ID").context("[ FAILED ] CHANNEL_IDが設定されていません")?;
+        dotenv_handler::get("CHANNEL_ID").await?;
     let channel_id = ChannelId::from_str(&channel_id_string)?;
     let webhook = get_webhook(&ctx, channel_id).await?;
 
@@ -94,7 +95,7 @@ async fn get_embed(ctx: &SerenityContext, info: &WebhookHandler) -> CreateEmbed 
 }
 
 async fn get_button() -> CreateButton {
-    let emoji = dotenv::var("JOIN_EMOJI").expect("[ FAILED ] JOIN_EMOJIが設定されていません");
+    let emoji = dotenv_handler::get("JOIN_EMOJI").await.expect("[ FAILED ] JOIN_EMOJIが設定されていません");
     let button = CreateButton::new("参加する")
         .label("参加する")
         .style(ButtonStyle::Secondary)
@@ -107,8 +108,7 @@ async fn get_button() -> CreateButton {
 }
 
 async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResult<Webhook> {
-    let redis_pass = dotenv::var("REDIS_PASS")
-        .context("[ FAILED ] Redisのパスワードが設定されていません")?;
+    let redis_pass = dotenv_handler::get("REDIS_PASS").await?;
     if let Ok(Some(webhook_url)) = Valkey::get(&redis_pass, &channel_id.to_string()).await {
         if let Ok(webhook) = Webhook::from_url(&ctx.http, &webhook_url).await {
             return Ok(webhook);
