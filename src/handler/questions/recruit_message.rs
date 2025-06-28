@@ -4,7 +4,7 @@ use serenity::model::application::InputTextStyle;
 pub async fn recruit_message() -> CreateInteractionResponse {
     let action_row = vec![CreateActionRow::InputText(
         CreateInputText::new(
-            InputTextStyle::Paragraph,
+            InputTextStyle::Short,
             "募集メッセージを入力しましょう",
             "募集メッセージ",
         )

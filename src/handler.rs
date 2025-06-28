@@ -9,6 +9,8 @@ mod pin;
 use pin::pin;
 mod questions;
 use questions::questions;
+mod webhook;
+use crate::handler::webhook::create::create as webhook_create;
 
 pub struct Handler;
 
@@ -33,6 +35,11 @@ impl EventHandler for Handler {
             questions(ctx, component)
                 .await
                 .expect("[ FAILED ] インタラクションの処理に失敗しました");
+        } else if let Interaction::Modal(modal) = interaction {
+            modal.defer(&ctx.http).await.expect("[ FAILED ] モーダルの応答に失敗しました");
+            println!("[ OK ] モーダルを受信しました: {}", modal.data.custom_id);
+            webhook_create(&ctx, modal).await
+                .expect("[ FAILED ] Webhookの作成に失敗しました");
         }
     }
 }

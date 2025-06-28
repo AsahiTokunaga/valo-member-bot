@@ -10,15 +10,15 @@ pub async fn server() -> CreateInteractionResponse {
         .title("サーバーを選択してください");
     let select_menu_kind = CreateSelectMenuKind::String {
         options: vec![
-            CreateSelectMenuOption::new("Tokyo/東京", "Tokyo/東京")
+            CreateSelectMenuOption::new("Tokyo/東京", "Tokyo/東京🇯🇵")
                 .emoji(ReactionType::Unicode("🇯🇵".to_string())),
-            CreateSelectMenuOption::new("Hong Kong/香港", "Hong Kong/香港")
+            CreateSelectMenuOption::new("Hong Kong/香港", "Hong Kong/香港 🇭🇰")
                 .emoji(ReactionType::Unicode("🇭🇰".to_string())),
-            CreateSelectMenuOption::new("Singapore/シンガポール", "Singapore/シンガポール")
+            CreateSelectMenuOption::new("Singapore/シンガポール", "Singapore/シンガポール 🇸🇬")
                 .emoji(ReactionType::Unicode("🇸🇬".to_string())),
-            CreateSelectMenuOption::new("Sydney/シドニー", "Sydney/シドニー")
-                .emoji(ReactionType::Unicode("🇺🇲".to_string())),
-            CreateSelectMenuOption::new("Mumbai/ムンバイ", "Mumbai/ムンバイ")
+            CreateSelectMenuOption::new("Sydney/シドニー", "Sydney/シドニー 🇦🇺")
+                .emoji(ReactionType::Unicode("🇦🇺".to_string())),
+            CreateSelectMenuOption::new("Mumbai/ムンバイ", "Mumbai/ムンバイ 🇮🇳")
                 .emoji(ReactionType::Unicode("🇮🇳".to_string())),
         ],
     };
