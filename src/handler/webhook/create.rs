@@ -17,6 +17,8 @@ use crate::handler::questions::component_handler::ComponentHandler;
 use crate::handler::webhook::WebhookHandler;
 use crate::valkey::Valkey;
 
+const BASE_IMG_URL: &str = "https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot/feature/get-image/imgs/";
+
 pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
     let user_id = modal.user.id;
     let channel_id_string =
@@ -119,4 +121,8 @@ async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResu
         Valkey::set(&redis_pass, &channel_id.to_string(), &webhook_url).await?;
     }
     Ok(builder)
+}
+
+async fn get_thumbnail(webhook: &Webhook) {
+    
 }
