@@ -3,10 +3,10 @@ use once_cell::sync::Lazy;
 use serenity::model::application::ComponentInteraction;
 use serenity::model::id::InteractionId;
 use serenity::model::id::UserId;
-use tokio::sync::RwLock;
-use std::collections::HashMap;
 use serenity::model::user::User;
+use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub mod create;
 
@@ -18,6 +18,7 @@ pub static WEBHOOKS: Webhook = Lazy::new(|| RwLock::new(HashMap::new()));
 pub struct WebhookHandler {
     pub ap_server: String,
     pub mode: String,
+    pub rank: String,
     pub max_member: u8,
     pub joined: Vec<UserId>,
 }
@@ -30,6 +31,7 @@ impl WebhookHandler {
             Arc::new(RwLock::new(WebhookHandler {
                 ap_server: String::new(),
                 mode: String::new(),
+                rank: String::new(),
                 max_member: 0,
                 joined: vec![component.user.id],
             })),
@@ -60,6 +62,7 @@ impl WebhookHandler {
             let response = WebhookHandler {
                 ap_server: webhook.ap_server.clone(),
                 mode: webhook.mode.clone(),
+                rank: webhook.rank.clone(),
                 max_member: webhook.max_member,
                 joined: webhook.joined.clone(),
             };
@@ -83,7 +86,19 @@ impl WebhookHandler {
         webhook.mode = mode.to_string();
         Ok(())
     }
-
+    pub async fn set_rank(component: &ComponentInteraction, rank: &str) -> AnyhowResult<()> {
+        let id = component.id;
+        let mut map = WEBHOOKS.try_write()?;
+        let mut webhook = if let Some(webhook) = map.get_mut(&id) {
+            webhook.write().await
+        } else {
+            Err(anyhow::anyhow!(
+                "[ FAILED ] InteractionIdに対するWebhookHandlerが見つかりません: set_rank"
+            ))?
+        };
+        webhook.rank = rank.to_string();
+        Ok(())
+    }
     pub async fn set_max_member(component: &ComponentInteraction, max: u8) -> AnyhowResult<()> {
         let id = component.id;
         let mut map = WEBHOOKS.try_write()?;
@@ -97,7 +112,7 @@ impl WebhookHandler {
         webhook.max_member = max;
         Ok(())
     }
-    
+
     // TODO: webhookメッセージのボタンを押すと下記の関数で値が増加する
     pub async fn _add_joined(component: &ComponentInteraction, user: &User) -> AnyhowResult<()> {
         let id = component.id;
