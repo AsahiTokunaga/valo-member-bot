@@ -14,7 +14,7 @@ use crate::valkey::Valkey;
 pub async fn pin(ctx: SerenityContext, msg: &Message) -> AnyhowResult<()> {
     delete_latest(&ctx).await?;
     let embed = CreateEmbed::new()
-        .colour(16732498)
+        .colour(16777215)
         .description("# ここから募集作成！\nサーバーのみんなとVALORANTをするために、下のボタンを押すとアンレートやコンペティティブ、カスタムの募集を作成することが出来ます！");
     let button = CreateButton::new("募集を作成")
         .label("募集を作成")

@@ -16,6 +16,7 @@ pub async fn rank() -> EditInteractionResponse {
             CreateSelectMenuOption::new("ゴールド", "ゴールド"),
             CreateSelectMenuOption::new("プラチナ", "プラチナ"),
             CreateSelectMenuOption::new("ダイヤモンド", "ダイヤモンド"),
+            CreateSelectMenuOption::new("アセンダント", "アセンダント"),
             CreateSelectMenuOption::new("イモータル", "イモータル"),
             CreateSelectMenuOption::new("レディアント", "レディアント"),
         ],
