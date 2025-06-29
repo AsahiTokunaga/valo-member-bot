@@ -17,12 +17,12 @@ use crate::handler::questions::component_handler::ComponentHandler;
 use crate::handler::webhook::WebhookHandler;
 use crate::valkey::Valkey;
 
-const BASE_IMG_URL: &str = "https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot/feature/get-image/imgs/";
+const BASE_IMG_URL: &str =
+    "https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot/feature/get-image/imgs/";
 
 pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
     let user_id = modal.user.id;
-    let channel_id_string =
-        dotenv_handler::get("CHANNEL_ID").await?;
+    let channel_id_string = dotenv_handler::get("CHANNEL_ID").await?;
     let channel_id = ChannelId::from_str(&channel_id_string)?;
     let webhook = get_webhook(&ctx, channel_id).await?;
 
@@ -83,21 +83,34 @@ async fn get_embed(ctx: &SerenityContext, info: &WebhookHandler) -> CreateEmbed 
             names.push(name);
         }
     }
-    let embed = CreateEmbed::new()
+    let mode = if info.mode == "アンレート" {
+        "アンレート"
+    } else if info.mode == "コンペティティブ" {
+        info.rank.as_str()
+    } else {
+        "カスタム"
+    };
+    let thumbnail = get_thumbnail(&mode).await;
+    let mut embed = CreateEmbed::new()
         .color(16732498)
         .description(format!(
             "## ({}/{}) {}\nサーバー：{}",
             info.joined.len(),
             info.max_member,
             info.mode,
-            info.ap_server
+            info.ap_server,
         ))
         .field("参加者", names.join("\n"), false);
+    if let Some(url) = thumbnail {
+        embed = embed.thumbnail(url);
+    }
     embed
 }
 
 async fn get_button() -> CreateButton {
-    let emoji = dotenv_handler::get("JOIN_EMOJI").await.expect("[ FAILED ] JOIN_EMOJIが設定されていません");
+    let emoji = dotenv_handler::get("JOIN_EMOJI")
+        .await
+        .expect("[ FAILED ] JOIN_EMOJIが設定されていません");
     let button = CreateButton::new("参加する")
         .label("参加する")
         .style(ButtonStyle::Secondary)
@@ -116,13 +129,28 @@ async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResu
             return Ok(webhook);
         }
     }
-    let builder = CreateWebhook::new("valo募集パネルwebhook").execute(&ctx.http, channel_id).await?;
+    let builder = CreateWebhook::new("valo募集パネルwebhook")
+        .execute(&ctx.http, channel_id)
+        .await?;
     if let Ok(webhook_url) = builder.url() {
         Valkey::set(&redis_pass, &channel_id.to_string(), &webhook_url).await?;
     }
     Ok(builder)
 }
 
-async fn get_thumbnail(webhook: &Webhook) {
-    
+async fn get_thumbnail(webhook: &str) -> Option<String> {
+    match webhook {
+        "レディアント" => Some(format!("{}radiant.png", BASE_IMG_URL)),
+        "イモータル" => Some(format!("{}immortal.png", BASE_IMG_URL)),
+        "アセンダント" => Some(format!("{}ascendant.png", BASE_IMG_URL)),
+        "ダイヤモンド" => Some(format!("{}diamond.png", BASE_IMG_URL)),
+        "プラチナ" => Some(format!("{}platinum.png", BASE_IMG_URL)),
+        "ゴールド" => Some(format!("{}gold.png", BASE_IMG_URL)),
+        "シルバー" => Some(format!("{}silver.png", BASE_IMG_URL)),
+        "ブロンズ" => Some(format!("{}bronze.png", BASE_IMG_URL)),
+        "アイアン" => Some(format!("{}iron.png", BASE_IMG_URL)),
+        "どこでも" => Some(format!("{}unranked.png", BASE_IMG_URL)),
+        "アンレート" => Some(format!("{}unrated.png", BASE_IMG_URL)),
+        _ => None,
+    }
 }
