@@ -30,6 +30,9 @@ pub async fn member(mode: &str) -> EditInteractionResponse {
             CreateSelectMenuOption::new("9人", "9人"),
             CreateSelectMenuOption::new("10人", "10人"),
         ],
+        "どこでも" => vec![
+            CreateSelectMenuOption::new("フルパ", "フルパ"),
+        ],
         _ => vec![
             CreateSelectMenuOption::new("デュオ", "デュオ"),
             CreateSelectMenuOption::new("トリオ", "トリオ"),

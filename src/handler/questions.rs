@@ -13,6 +13,8 @@ use member_select::member;
 mod recruit_message;
 use crate::handler::webhook::WebhookHandler;
 use recruit_message::recruit_message;
+mod rank_select;
+use rank_select::rank;
 
 pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) -> AnyhowResult<()> {
     match component.data.custom_id.as_str() {
@@ -48,15 +50,26 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             } else {
                 "アンレート"
             };
-            if let Some(component) = ComponentHandler::get(user_id).await {
+            let component = if let Some(component) = ComponentHandler::get(user_id).await {
+                component
+            } else {
+                return Err(anyhow::anyhow!(
+                    "[ FAILED ] 募集の作成に失敗しました: ユーザーのコンポーネントが見つかりません"
+                ));
+            };
+            if mode == "アンレート" || mode == "カスタム" {
                 let question = member(&mode).await;
+                component.edit_response(&ctx.http, question).await?;
+                WebhookHandler::set_mode(&component, &mode).await?;
+            } else {
+                let question = rank().await;
                 component.edit_response(&ctx.http, question).await?;
                 WebhookHandler::set_mode(&component, &mode).await?;
             }
         }
         "募集人数を選択" => {
             let user_id = component.user.id;
-            let response = recruit_message().await;
+            let question = recruit_message().await;
             let party = if let ComponentInteractionDataKind::StringSelect { values } =
                 &component.data.kind
             {
@@ -80,10 +93,31 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 "10人" => 10,
                 _ => 5,
             };
-            component.create_response(&ctx.http, response).await?;
+            component.create_response(&ctx.http, question).await?;
             if let Some(component) = ComponentHandler::get(user_id).await {
                 WebhookHandler::set_max_member(&component, max_member).await?;
             }
+        }
+        "ランクを選択" => {
+            component.defer(&ctx.http).await?;
+            let user_id = component.user.id;
+            let rank = if let ComponentInteractionDataKind::StringSelect { values } =
+                &component.data.kind
+            {
+                &values.get(0).unwrap()
+            } else {
+                "どこでも"
+            };
+            let component = if let Some(component) = ComponentHandler::get(user_id).await {
+                component
+            } else {
+                return Err(anyhow::anyhow!(
+                    "[ FAILED ] 募集の作成に失敗しました: ユーザーのコンポーネントが見つかりません"
+                ));
+            };
+            WebhookHandler::set_rank(&component, rank).await?;
+            let question = member(&rank).await;
+            component.edit_response(&ctx.http, question).await?;
         }
         _ => {}
     }
