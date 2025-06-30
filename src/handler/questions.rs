@@ -58,7 +58,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 ));
             };
             if mode == "アンレート" || mode == "カスタム" {
-                let question = member(&mode);
+                let question = member(mode.to_string()).await;
                 component.edit_response(&ctx.http, question).await?;
                 WebhookHandler::set_mode(&component, &mode).await?;
             } else {
@@ -116,7 +116,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 ));
             };
             WebhookHandler::set_rank(&component, rank).await?;
-            let question = member(&rank);
+            let question = member(rank.to_string()).await;
             component.edit_response(&ctx.http, question).await?;
         }
         _ => {}
