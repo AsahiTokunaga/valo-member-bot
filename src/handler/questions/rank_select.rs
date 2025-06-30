@@ -3,7 +3,7 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-pub async fn rank() -> EditInteractionResponse {
+pub fn rank() -> EditInteractionResponse {
     let embed = CreateEmbed::new()
         .colour(16732498)
         .title("ランクを選択してください");

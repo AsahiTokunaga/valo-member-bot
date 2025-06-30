@@ -12,9 +12,9 @@ mod dotenv_handler;
 #[tokio::main]
 async fn main() -> AnyhowResult<()> {
     dotenv().context("[ FAILED ] .envファイルの読み込みに失敗しました")?;
-    let redis_pass = dotenv_handler::get("REDIS_PASS").await?;
+    let redis_pass = dotenv_handler::get("REDIS_PASS")?;
     Valkey::ping(&redis_pass).await?;
-    let token = dotenv_handler::get("TOKEN").await?;
+    let token = dotenv_handler::get("TOKEN")?;
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
     let mut client = SerenityClient::builder(&token, intents)
         .event_handler(Handler)

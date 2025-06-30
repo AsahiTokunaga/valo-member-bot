@@ -21,7 +21,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
         "募集を作成" => {
             ComponentHandler::set(&component).await;
             WebhookHandler::new(&component).await?;
-            let question = server().await;
+            let question = server();
             component.create_response(&ctx.http, question).await?;
         }
         "サーバーを選択" => {
@@ -35,7 +35,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 "Tokyo/東京".to_string()
             };
             if let Some(component) = ComponentHandler::get(user_id).await {
-                let question = q_match().await;
+                let question = q_match();
                 component.edit_response(&ctx.http, question).await?;
                 WebhookHandler::set_ap_server(&component, ap_server).await?;
             }
@@ -58,18 +58,18 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 ));
             };
             if mode == "アンレート" || mode == "カスタム" {
-                let question = member(&mode).await;
+                let question = member(&mode);
                 component.edit_response(&ctx.http, question).await?;
                 WebhookHandler::set_mode(&component, &mode).await?;
             } else {
-                let question = rank().await;
+                let question = rank();
                 component.edit_response(&ctx.http, question).await?;
                 WebhookHandler::set_mode(&component, &mode).await?;
             }
         }
         "募集人数を選択" => {
             let user_id = component.user.id;
-            let question = recruit_message().await;
+            let question = recruit_message();
             let party = if let ComponentInteractionDataKind::StringSelect { values } =
                 &component.data.kind
             {
@@ -116,7 +116,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 ));
             };
             WebhookHandler::set_rank(&component, rank).await?;
-            let question = member(&rank).await;
+            let question = member(&rank);
             component.edit_response(&ctx.http, question).await?;
         }
         _ => {}

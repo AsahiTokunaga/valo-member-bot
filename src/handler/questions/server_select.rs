@@ -4,7 +4,7 @@ use serenity::builder::{
 };
 use serenity::model::channel::ReactionType;
 
-pub async fn server() -> CreateInteractionResponse {
+pub fn server() -> CreateInteractionResponse {
     let embed = CreateEmbed::new()
         .colour(16732498)
         .title("サーバーを選択してください");

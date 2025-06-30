@@ -17,12 +17,9 @@ use crate::handler::questions::component_handler::ComponentHandler;
 use crate::handler::webhook::WebhookHandler;
 use crate::valkey::Valkey;
 
-const BASE_IMG_URL: &str =
-    "https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot/feature/get-image/imgs/";
-
 pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
     let user_id = modal.user.id;
-    let channel_id_string = dotenv_handler::get("CHANNEL_ID").await?;
+    let channel_id_string = dotenv_handler::get("CHANNEL_ID")?;
     let channel_id = ChannelId::from_str(&channel_id_string)?;
     let webhook = get_webhook(&ctx, channel_id).await?;
 
@@ -109,9 +106,8 @@ async fn get_embed(ctx: &SerenityContext, info: &WebhookHandler) -> CreateEmbed 
 }
 
 async fn get_button() -> CreateButton {
-    let emoji = dotenv_handler::get("JOIN_EMOJI")
-        .await
-        .expect("[ FAILED ] JOIN_EMOJIが設定されていません");
+    let emoji =
+        dotenv_handler::get("JOIN_EMOJI").expect("[ FAILED ] JOIN_EMOJIが設定されていません");
     let button = CreateButton::new("参加する")
         .label("参加する")
         .style(ButtonStyle::Secondary)
@@ -124,7 +120,7 @@ async fn get_button() -> CreateButton {
 }
 
 async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResult<Webhook> {
-    let redis_pass = dotenv_handler::get("REDIS_PASS").await?;
+    let redis_pass = dotenv_handler::get("REDIS_PASS")?;
     if let Ok(Some(webhook_url)) = Valkey::get(&redis_pass, &channel_id.to_string()).await {
         if let Ok(webhook) = Webhook::from_url(&ctx.http, &webhook_url).await {
             return Ok(webhook);
@@ -140,18 +136,22 @@ async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResu
 }
 
 fn get_thumbnail(webhook: &str) -> Option<String> {
+    let base_img_url = dotenv_handler::get("BASE_IMG_URL").unwrap_or_else(|e| {
+        println!("{}", e);
+        String::new()
+    });
     match webhook {
-        "レディアント" => Some(format!("{}radiant.png", BASE_IMG_URL)),
-        "イモータル" => Some(format!("{}immortal.png", BASE_IMG_URL)),
-        "アセンダント" => Some(format!("{}ascendant.png", BASE_IMG_URL)),
-        "ダイヤモンド" => Some(format!("{}diamond.png", BASE_IMG_URL)),
-        "プラチナ" => Some(format!("{}platinum.png", BASE_IMG_URL)),
-        "ゴールド" => Some(format!("{}gold.png", BASE_IMG_URL)),
-        "シルバー" => Some(format!("{}silver.png", BASE_IMG_URL)),
-        "ブロンズ" => Some(format!("{}bronze.png", BASE_IMG_URL)),
-        "アイアン" => Some(format!("{}iron.png", BASE_IMG_URL)),
-        "どこでも" => Some(format!("{}unranked.png", BASE_IMG_URL)),
-        "アンレート" => Some(format!("{}unrated.png", BASE_IMG_URL)),
+        "レディアント" => Some(format!("{}radiant.png", base_img_url)),
+        "イモータル" => Some(format!("{}immortal.png", base_img_url)),
+        "アセンダント" => Some(format!("{}ascendant.png", base_img_url)),
+        "ダイヤモンド" => Some(format!("{}diamond.png", base_img_url)),
+        "プラチナ" => Some(format!("{}platinum.png", base_img_url)),
+        "ゴールド" => Some(format!("{}gold.png", base_img_url)),
+        "シルバー" => Some(format!("{}silver.png", base_img_url)),
+        "ブロンズ" => Some(format!("{}bronze.png", base_img_url)),
+        "アイアン" => Some(format!("{}iron.png", base_img_url)),
+        "どこでも" => Some(format!("{}unranked.png", base_img_url)),
+        "アンレート" => Some(format!("{}unrated.png", base_img_url)),
         _ => None,
     }
 }

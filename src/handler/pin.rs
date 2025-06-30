@@ -19,10 +19,10 @@ pub async fn pin(ctx: SerenityContext, msg: &Message) -> AnyhowResult<()> {
     let button = CreateButton::new("募集を作成")
         .label("募集を作成")
         .style(ButtonStyle::Secondary)
-        .emoji(EmojiId::new(dotenv_handler::get("PLUS_EMOJI").await?.parse::<u64>()?));
+        .emoji(EmojiId::new(dotenv_handler::get("PLUS_EMOJI")?.parse::<u64>()?));
     let message = CreateMessage::new().embed(embed).button(button);
 
-    let redis_pass = dotenv_handler::get("REDIS_PASS").await?;
+    let redis_pass = dotenv_handler::get("REDIS_PASS")?;
     let res = msg.channel_id.send_message(&ctx.http, message).await?;
     let res_id = res.id.to_string();
 
@@ -32,12 +32,12 @@ pub async fn pin(ctx: SerenityContext, msg: &Message) -> AnyhowResult<()> {
 
 async fn delete_latest(ctx: &SerenityContext) -> AnyhowResult<()> {
     let redis_pass =
-        dotenv_handler::get("REDIS_PASS").await?;
+        dotenv_handler::get("REDIS_PASS")?;
     if let Some(latest_id) = Valkey::get(&redis_pass, "latest")
         .await
         .context("[ FAILED ] Redisから最新のメッセージIDを取得できませんでした")?
     {
-        let channel_id = ChannelId::from_str(&dotenv_handler::get("CHANNEL_ID").await?)?;
+        let channel_id = ChannelId::from_str(&dotenv_handler::get("CHANNEL_ID")?)?;
         let message_id = MessageId::from_str(&latest_id)?;
         if let Ok(message) = channel_id.message(&ctx.http, message_id).await {
             message.delete(&ctx.http).await?;

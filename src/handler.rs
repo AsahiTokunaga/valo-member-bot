@@ -25,7 +25,6 @@ impl EventHandler for Handler {
         println!("[ OK ] メッセージを受信しました");
         if msg.author.id.to_string()
             != dotenv_handler::get("BOT_ID")
-                .await
                 .expect("[ FAILED ] BOT_IDが設定されていません")
         {
             pin(ctx, &msg)

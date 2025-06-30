@@ -3,7 +3,7 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-pub async fn member(mode: &str) -> EditInteractionResponse {
+pub fn member(mode: &str) -> EditInteractionResponse {
     let embed = CreateEmbed::new()
         .colour(16732498)
         .title("募集人数を選択してください");

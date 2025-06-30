@@ -3,7 +3,7 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-pub async fn q_match() -> EditInteractionResponse {
+pub fn q_match() -> EditInteractionResponse {
     let embed = CreateEmbed::new()
         .colour(16732498)
         .title("募集形式を選択してください");
