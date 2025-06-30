@@ -83,15 +83,12 @@ async fn get_embed(ctx: &SerenityContext, info: &WebhookHandler) -> CreateEmbed 
             names.push(name);
         }
     }
-    let mode = if info.mode == "アンレート" {
-        "アンレート"
-    } else if info.mode == "コンペティティブ" {
-        info.rank.as_str()
-    } else {
-        "カスタム"
+    let mode = match info.mode.as_str() {
+        "コンペティティブ" => &info.rank,
+        _ => &info.mode,
     };
-    let colour = get_colour(&info.rank).await;
-    let thumbnail = get_thumbnail(&mode).await;
+    let colour = get_colour(&info.rank);
+    let thumbnail = get_thumbnail(&mode);
     let mut embed = CreateEmbed::new()
         .color(16732498)
         .description(format!(
@@ -142,7 +139,7 @@ async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResu
     Ok(builder)
 }
 
-async fn get_thumbnail(webhook: &str) -> Option<String> {
+fn get_thumbnail(webhook: &str) -> Option<String> {
     match webhook {
         "レディアント" => Some(format!("{}radiant.png", BASE_IMG_URL)),
         "イモータル" => Some(format!("{}immortal.png", BASE_IMG_URL)),
@@ -159,7 +156,7 @@ async fn get_thumbnail(webhook: &str) -> Option<String> {
     }
 }
 
-async fn get_colour(rank: &str) -> Option<u32> {
+fn get_colour(rank: &str) -> Option<u32> {
     match rank {
         "アイアン" => Some(5197647),
         "ブロンズ" => Some(8804608),
