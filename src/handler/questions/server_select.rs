@@ -4,9 +4,11 @@ use serenity::builder::{
 };
 use serenity::model::channel::ReactionType;
 
+use crate::handler::BASE_COLOR;
+
 pub fn server() -> CreateInteractionResponse {
     let embed = CreateEmbed::new()
-        .colour(16732498)
+        .colour(BASE_COLOR)
         .title("サーバーを選択してください");
     let select_menu_kind = CreateSelectMenuKind::String {
         options: vec![

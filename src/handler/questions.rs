@@ -34,11 +34,10 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             } else {
                 "Tokyo/東京".to_string()
             };
-            if let Some(component) = ComponentHandler::get(user_id).await {
-                let question = q_match();
-                component.edit_response(&ctx.http, question).await?;
-                WebhookHandler::set_ap_server(&component, ap_server).await?;
-            }
+            let component = ComponentHandler::get(user_id).await;
+            let question = q_match();
+            component.edit_response(&ctx.http, question).await?;
+            WebhookHandler::set_ap_server(&component, ap_server).await?;
         }
         "募集形式を選択" => {
             component.defer(&ctx.http).await?;
@@ -50,13 +49,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             } else {
                 "アンレート"
             };
-            let component = if let Some(component) = ComponentHandler::get(user_id).await {
-                component
-            } else {
-                return Err(anyhow::anyhow!(
-                    "[ FAILED ] 募集の作成に失敗しました: ユーザーのコンポーネントが見つかりません"
-                ));
-            };
+            let component = ComponentHandler::get(user_id).await;
             if mode == "アンレート" || mode == "カスタム" {
                 let question = member(mode.to_string()).await;
                 component.edit_response(&ctx.http, question).await?;
@@ -94,9 +87,8 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 _ => 5,
             };
             component.create_response(&ctx.http, question).await?;
-            if let Some(component) = ComponentHandler::get(user_id).await {
-                WebhookHandler::set_max_member(&component, max_member).await?;
-            }
+            let component = ComponentHandler::get(user_id).await;
+            WebhookHandler::set_max_member(&component, max_member).await?;
         }
         "ランクを選択" => {
             component.defer(&ctx.http).await?;
@@ -108,13 +100,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             } else {
                 "どこでも"
             };
-            let component = if let Some(component) = ComponentHandler::get(user_id).await {
-                component
-            } else {
-                return Err(anyhow::anyhow!(
-                    "[ FAILED ] 募集の作成に失敗しました: ユーザーのコンポーネントが見つかりません"
-                ));
-            };
+            let component = ComponentHandler::get(user_id).await;
             WebhookHandler::set_rank(&component, rank).await?;
             let question = member(rank.to_string()).await;
             component.edit_response(&ctx.http, question).await?;

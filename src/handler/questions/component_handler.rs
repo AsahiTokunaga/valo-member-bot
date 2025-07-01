@@ -14,8 +14,16 @@ impl ComponentHandler {
         let mut map = COMPONENTS.write().await;
         map.insert(user_id, component.clone());
     }
-    pub async fn get(user_id: UserId) -> Option<ComponentInteraction> {
+    pub async fn get(user_id: UserId) -> ComponentInteraction {
         let map = COMPONENTS.read().await;
-        map.get(&user_id).cloned()
+        let test = if let Some(value) = map.get(&user_id) {
+            value
+        } else {
+            panic!(
+                "[ FAILED ] ユーザーのコンポーネントが見つかりません: {:?}",
+                user_id
+            );
+        };
+        test.clone()
     }
 }

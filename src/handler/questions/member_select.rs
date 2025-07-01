@@ -5,10 +5,12 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
+use crate::handler::BASE_COLOR;
+
 pub async fn member(mode: String) -> EditInteractionResponse {
     let create_embed_task = tokio::spawn(async {
         CreateEmbed::new()
-            .colour(16732498)
+            .colour(BASE_COLOR)
             .title("募集人数を選択してください")
     });
     let create_select_menu_task = tokio::spawn(async move {

@@ -13,6 +13,18 @@ use questions::questions;
 mod webhook;
 use crate::handler::webhook::create::create as webhook_create;
 
+const PIN_MESSAGE_COLOR: u32 = 0xffffff;
+const BASE_COLOR: u32 = 0xff5152;
+const RADIANT_COLOR: u32 = 0xf9efa2;
+const IMMORTAL_COLOR: u32 = 0xbf334c;
+const ASCENDANT_COLOR: u32 = 0x1e8a51;
+const DIAMOND_COLOR: u32 = 0xc587f5;
+const PLATINUM_COLOR: u32 = 0x39a1b1;
+const GOLD_COLOR: u32 = 0xeabd44;
+const SILVER_COLOR: u32 = 0xd9e0dd;
+const BRONZE_COLOR: u32 = 0x865900;
+const IRON_COLOR: u32 = 0x5197647;
+
 pub struct Handler;
 
 #[async_trait]

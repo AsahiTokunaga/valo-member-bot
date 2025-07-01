@@ -3,9 +3,11 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
+use crate::handler::BASE_COLOR;
+
 pub fn rank() -> EditInteractionResponse {
     let embed = CreateEmbed::new()
-        .colour(16732498)
+        .colour(BASE_COLOR)
         .title("ランクを選択してください");
     let select_menu_kind = CreateSelectMenuKind::String {
         options: vec![
