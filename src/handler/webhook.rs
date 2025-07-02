@@ -10,12 +10,12 @@ use tokio::sync::RwLock;
 
 pub mod create;
 
-type Webhook = Lazy<RwLock<HashMap<InteractionId, Arc<RwLock<WebhookHandler>>>>>;
+type Webhooks = Lazy<RwLock<HashMap<InteractionId, Arc<RwLock<WebhookDatas>>>>>;
 
-pub static WEBHOOKS: Webhook = Lazy::new(|| RwLock::new(HashMap::new()));
+pub static WEBHOOKS: Webhooks = Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Debug)]
-pub struct WebhookHandler {
+pub struct WebhookDatas {
     pub ap_server: String,
     pub mode: String,
     pub rank: String,
@@ -23,12 +23,12 @@ pub struct WebhookHandler {
     pub joined: Vec<UserId>,
 }
 
-impl WebhookHandler {
+impl WebhookDatas {
     pub async fn new(component: &ComponentInteraction) -> AnyhowResult<()> {
         let mut map = WEBHOOKS.try_write()?;
         map.insert(
             component.id,
-            Arc::new(RwLock::new(WebhookHandler {
+            Arc::new(RwLock::new(WebhookDatas {
                 ap_server: String::new(),
                 mode: String::new(),
                 rank: String::new(),
@@ -38,28 +38,30 @@ impl WebhookHandler {
         );
         Ok(())
     }
-    pub async fn set_ap_server(
-        component: &ComponentInteraction,
-        ap_server: String,
-    ) -> AnyhowResult<()> {
+
+    pub async fn with_mute<F>(component: &ComponentInteraction, f: F) -> AnyhowResult<()>
+    where 
+        F: FnOnce(&mut WebhookDatas),
+    {
         let id = component.id;
-        let mut map = WEBHOOKS.try_write()?;
-        let mut webhok = if let Some(webhook) = map.get_mut(&id) {
-            webhook.write().await
+        let mut map = WEBHOOKS.write().await;
+        let mut webhook = if let Some(w) = map.get_mut(&id) {
+            w.write().await
         } else {
-            Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookHandlerが見つかりません: set_ap_server"
-            ))?
+            return Err(anyhow::anyhow!(
+                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: with_mute"
+            ));
         };
-        webhok.ap_server = ap_server;
+        f(&mut webhook);
         Ok(())
     }
-    pub async fn get(component: &ComponentInteraction) -> AnyhowResult<WebhookHandler> {
+
+    pub async fn get(component: &ComponentInteraction) -> AnyhowResult<WebhookDatas> {
         let id = component.id;
         let map = WEBHOOKS.try_read()?;
         if let Some(webhook) = map.get(&id) {
             let webhook = webhook.read().await;
-            let response = WebhookHandler {
+            let response = WebhookDatas {
                 ap_server: webhook.ap_server.clone(),
                 mode: webhook.mode.clone(),
                 rank: webhook.rank.clone(),
@@ -69,50 +71,10 @@ impl WebhookHandler {
             Ok(response)
         } else {
             Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookHandlerが見つかりません: get"
+                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: get"
             ))?
         }
     }
-    pub async fn set_mode(component: &ComponentInteraction, mode: &str) -> AnyhowResult<()> {
-        let id = component.id;
-        let mut map = WEBHOOKS.try_write()?;
-        let mut webhook = if let Some(webhook) = map.get_mut(&id) {
-            webhook.write().await
-        } else {
-            Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookHandlerが見つかりません: set_mode"
-            ))?
-        };
-        webhook.mode = mode.to_string();
-        Ok(())
-    }
-    pub async fn set_rank(component: &ComponentInteraction, rank: &str) -> AnyhowResult<()> {
-        let id = component.id;
-        let mut map = WEBHOOKS.try_write()?;
-        let mut webhook = if let Some(webhook) = map.get_mut(&id) {
-            webhook.write().await
-        } else {
-            Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookHandlerが見つかりません: set_rank"
-            ))?
-        };
-        webhook.rank = rank.to_string();
-        Ok(())
-    }
-    pub async fn set_max_member(component: &ComponentInteraction, max: u8) -> AnyhowResult<()> {
-        let id = component.id;
-        let mut map = WEBHOOKS.try_write()?;
-        let mut webhook = if let Some(webhook) = map.get_mut(&id) {
-            webhook.try_write()?
-        } else {
-            Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookHandlerが見つかりません: add_member"
-            ))?
-        };
-        webhook.max_member = max;
-        Ok(())
-    }
-
     // TODO: webhookメッセージのボタンを押すと下記の関数で値が増加する
     pub async fn _add_joined(component: &ComponentInteraction, user: &User) -> AnyhowResult<()> {
         let id = component.id;
@@ -121,7 +83,7 @@ impl WebhookHandler {
             webhook.try_write()?
         } else {
             Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookHandlerが見つかりません: add_joined"
+                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: add_joined"
             ))?
         };
         webhook.joined.push(user.id);

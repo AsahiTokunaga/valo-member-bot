@@ -15,8 +15,8 @@ use serenity::model::webhook::Webhook;
 use std::str::FromStr;
 
 use crate::dotenv_handler;
-use crate::handler::questions::component_handler::ComponentHandler;
-use crate::handler::webhook::WebhookHandler;
+use crate::handler::questions::component_store::ComponentStore;
+use crate::handler::webhook::WebhookDatas;
 use crate::handler::{
     ASCENDANT_COLOR, BASE_COLOR, BRONZE_COLOR, DIAMOND_COLOR, GOLD_COLOR, IMMORTAL_COLOR,
     IRON_COLOR, PLATINUM_COLOR, RADIANT_COLOR, SILVER_COLOR,
@@ -51,8 +51,8 @@ pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowRes
 
     let webhook = get_webhook(ctx, channel_id);
 
-    let component = ComponentHandler::get(user_id).await;
-    let data = WebhookHandler::get(&component).await?;
+    let component = ComponentStore::get(user_id).await;
+    let data = WebhookDatas::get(&component).await?;
     let embed = get_embed(ctx, &data);
 
     let mut builder = ExecuteWebhook::new()
@@ -73,7 +73,7 @@ pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowRes
     Ok(())
 }
 
-async fn get_embed(ctx: &SerenityContext, info: &WebhookHandler) -> CreateEmbed {
+async fn get_embed(ctx: &SerenityContext, info: &WebhookDatas) -> CreateEmbed {
     let mut users = info
         .joined
         .iter()

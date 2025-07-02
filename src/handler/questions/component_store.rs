@@ -6,9 +6,9 @@ use tokio::sync::RwLock;
 pub static COMPONENTS: Lazy<RwLock<HashMap<UserId, ComponentInteraction>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-pub struct ComponentHandler;
+pub struct ComponentStore;
 
-impl ComponentHandler {
+impl ComponentStore {
     pub async fn set(component: &ComponentInteraction) {
         let user_id = component.user.id;
         let mut map = COMPONENTS.write().await;

@@ -7,14 +7,11 @@ use serenity::builder::{
 
 use crate::handler::BASE_COLOR;
 
-pub async fn member(mode: String) -> EditInteractionResponse {
-    let create_embed_task = tokio::spawn(async {
-        CreateEmbed::new()
+pub fn member(mode: String) -> EditInteractionResponse {
+    let embed = CreateEmbed::new()
             .colour(BASE_COLOR)
-            .title("募集人数を選択してください")
-    });
-    let create_select_menu_task = tokio::spawn(async move {
-        let select_menu_vec = match mode.as_str() {
+            .title("募集人数を選択してください");
+    let select_menu_vec = match mode.as_str() {
             "アンレート" => vec![
                 CreateSelectMenuOption::new("デュオ", "デュオ"),
                 CreateSelectMenuOption::new("トリオ", "トリオ"),
@@ -44,33 +41,15 @@ pub async fn member(mode: String) -> EditInteractionResponse {
                 CreateSelectMenuOption::new("フルパ", "フルパ"),
             ],
         };
-        let select_menu_kind = CreateSelectMenuKind::String {
-            options: select_menu_vec,
-        };
-        CreateSelectMenu::new("募集人数を選択", select_menu_kind)
+
+    let select_menu_kind = CreateSelectMenuKind::String {
+        options: select_menu_vec,
+    };
+    let select_menu =CreateSelectMenu::new("募集人数を選択", select_menu_kind)
             .placeholder("募集人数を選択してください")
             .min_values(1)
-            .max_values(1)
-    });
-
-    let (embed, select_menu) = tokio::join!(create_embed_task, create_select_menu_task);
-    match (embed, select_menu) {
-        (Ok(embed), Ok(select_menu)) => EditInteractionResponse::new()
+            .max_values(1);
+    EditInteractionResponse::new()
             .embed(embed)
-            .select_menu(select_menu),
-        (Err(e), _) => {
-            println!("[ FAILED ] Embedの生成に失敗しました: {}", e);
-            EditInteractionResponse::new()
-                .content("Embedの生成に失敗しました。もう一度お試しください。")
-                .components(vec![])
-                .embeds(vec![])
-        }
-        (_, Err(e)) => {
-            println!("[ FAILED ] SelectMenuの生成に失敗しました: {}", e);
-            EditInteractionResponse::new()
-                .content("SelectMenuの生成に失敗しました。もう一度お試しください。")
-                .components(vec![])
-                .embeds(vec![])
-        }
-    }
+            .select_menu(select_menu)
 }
