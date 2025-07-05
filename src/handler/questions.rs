@@ -58,7 +58,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let component = ComponentStore::get(user_id).await;
             let edit_response_task = component.edit_response(&ctx.http, question);
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component, |w| w.ap_server = ap_server);
+                WebhookDatas::with_mute(&component.id, |w| w.ap_server = ap_server);
             let (webhook_data_set, edit_response) =
                 tokio::join!(webhook_data_set_task, edit_response_task);
             match (webhook_data_set, edit_response) {
@@ -88,7 +88,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             };
             let component = ComponentStore::get(user_id).await;
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component, |w| w.mode = mode.to_string());
+                WebhookDatas::with_mute(&component.id, |w| w.mode = mode.to_string());
             let edit_resuponse_task = if mode == "アンレート" || mode == "カスタム" {
                 let question = member(mode.to_string());
                 component.edit_response(&ctx.http, question)
@@ -138,7 +138,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let create_resuponse_task = component.create_response(&ctx.http, question);
             let component = ComponentStore::get(user_id).await;
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component, |w| w.max_member = max_member);
+                WebhookDatas::with_mute(&component.id, |w| w.max_member = max_member);
             let (webhook_data_set, create_response) =
                 tokio::join!(webhook_data_set_task, create_resuponse_task);
             match (webhook_data_set, create_response) {
@@ -170,7 +170,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let component = ComponentStore::get(user_id).await;
             let edit_response_task = component.edit_response(&ctx.http, question);
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component, |w| w.rank = rank.to_string());
+                WebhookDatas::with_mute(&component.id, |w| w.rank = rank.to_string());
             let (webhook_data_set, edit_response) =
                 tokio::join!(webhook_data_set_task, edit_response_task);
             match (webhook_data_set, edit_response) {

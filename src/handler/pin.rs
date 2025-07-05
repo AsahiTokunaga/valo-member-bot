@@ -29,21 +29,22 @@ pub async fn pin(ctx: SerenityContext, msg: &Message) -> AnyhowResult<()> {
     let send_message_task = msg.channel_id.send_message(&ctx.http, message);
     let (delete_latest, send_message) = tokio::join!(delete_latest_task, send_message_task);
     delete_latest?;
-    Valkey::set(&redis_pass, "latest", &send_message?.id.to_string())
-        .await?;
+    Valkey::set(&redis_pass, "latest", &send_message?.id.to_string()).await?;
     Ok(())
 }
 
 async fn delete_latest(ctx: &SerenityContext) -> AnyhowResult<()> {
     let redis_pass = dotenv_handler::get("REDIS_PASS")?;
     let channel_id = ChannelId::from_str(&dotenv_handler::get("CHANNEL_ID")?)?;
-    let get_latest_id_task = Valkey::get(&redis_pass, "latest");
-    let message_id = MessageId::from_str(
-        &get_latest_id_task
-            .await?
-            .expect("[ FAILED ] Redisから最新のメッセージIDを取得できませんでした"),
-    )?;
-    let get_message_task = channel_id.message(&ctx.http, message_id);
-    get_message_task.await?.delete(&ctx.http).await?;
+    let get_latest_id = Valkey::get(&redis_pass, "latest").await;
+    if let Ok(latest_id) = get_latest_id {
+        if let Some(latest_id) = latest_id {
+            let message_id = MessageId::from_str(latest_id.as_str());
+            if let Ok(message_id) = message_id {
+                let get_message_task = channel_id.message(&ctx.http, message_id);
+                get_message_task.await?.delete(&ctx.http).await?;
+            }
+        }
+    }
     Ok(())
 }

@@ -51,4 +51,18 @@ impl Valkey {
             Ok(value)
         }
     }
+
+    pub fn ttl_set<'a>(
+        redis_pass: &'a str,
+        key: &'a str,
+        val: &'a str,
+        ttl: u64,
+    ) -> impl Future<Output = AnyhowResult<()>> + 'a {
+        async move {
+            let lock = Self::new(redis_pass).await?;
+            let mut connection = lock.write().await;
+            connection.set_ex::<&str, &str, ()>(key, val, ttl).await?;
+           Ok(())
+        }
+    }
 }

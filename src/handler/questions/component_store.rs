@@ -16,14 +16,16 @@ impl ComponentStore {
     }
     pub async fn get(user_id: UserId) -> ComponentInteraction {
         let map = COMPONENTS.read().await;
-        let test = if let Some(value) = map.get(&user_id) {
-            value
+        if let Some(value) = map.get(&user_id) {
+            value.clone()
         } else {
-            panic!(
-                "[ FAILED ] ユーザーのコンポーネントが見つかりません: {:?}",
-                user_id
-            );
-        };
-        test.clone()
+            panic!("[ FAILED ] UserIdに対するComponentInteractionが見つかりません: get");
+        }
+    }
+    pub async fn del(user_id: UserId) {
+        let mut map = COMPONENTS.write().await;
+        if map.remove(&user_id).is_none() {
+            panic!("[ FAILED ] UserIdに対するComponentInteractionが見つかりません: del");
+        }
     }
 }

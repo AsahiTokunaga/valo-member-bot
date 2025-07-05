@@ -1,7 +1,7 @@
 use anyhow::Result as AnyhowResult;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
-use serenity::all::Builder;
+use serenity::all::{Builder, ReactionType};
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateEmbed, CreateWebhook, ExecuteWebhook,
 };
@@ -9,14 +9,14 @@ use serenity::client::Context as SerenityContext;
 use serenity::model::application::ActionRowComponent;
 use serenity::model::application::ButtonStyle;
 use serenity::model::application::ModalInteraction;
+use serenity::model::id::ChannelId;
 use serenity::model::id::UserId;
-use serenity::model::id::{ChannelId, EmojiId};
 use serenity::model::webhook::Webhook;
 use std::str::FromStr;
 
 use crate::dotenv_handler;
 use crate::handler::questions::component_store::ComponentStore;
-use crate::handler::webhook::WebhookDatas;
+use crate::handler::webhook::{InteractionIdStore, WebhookDatas};
 use crate::handler::{
     ASCENDANT_COLOR, BASE_COLOR, BRONZE_COLOR, DIAMOND_COLOR, GOLD_COLOR, IMMORTAL_COLOR,
     IRON_COLOR, PLATINUM_COLOR, RADIANT_COLOR, SILVER_COLOR,
@@ -47,29 +47,37 @@ pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowRes
         _ => None,
     };
     let button = get_button();
-    let action_row = CreateActionRow::Buttons(vec![button]);
-
+    let action_row = CreateActionRow::Buttons(button);
     let webhook = get_webhook(ctx, channel_id);
-
     let component = ComponentStore::get(user_id).await;
-    let data = WebhookDatas::get(&component).await?;
-    let embed = get_embed(ctx, &data);
-
-    let mut builder = ExecuteWebhook::new()
-        .avatar_url(user_avatar)
-        .username(user_name)
-        .embed(embed.await)
-        .components(vec![action_row]);
-    if let Some(content) = content {
+    let data = WebhookDatas::get(&component.id).await;
+    if let Some(webhook_data) = data {
+        let webhook_data = webhook_data.read().await;
+        let embed = get_embed(ctx, &webhook_data);
+        let mut builder = ExecuteWebhook::new()
+            .avatar_url(user_avatar)
+            .username(user_name)
+            .embed(embed.await)
+            .components(vec![action_row]);
+        drop(webhook_data);
         if let Some(content) = content {
-            builder = builder.content(content);
+            if let Some(content) = content {
+                builder = builder.content(content);
+            }
+        }
+
+        let webhook = webhook.await?;
+        let execute_webhook_handle = webhook.execute(&ctx.http, true, builder);
+        let delete_response_handle = component.delete_response(&ctx.http);
+        let (execute_webhook_result, _) =
+            tokio::try_join!(execute_webhook_handle, delete_response_handle)?;
+        if let Some(message) = execute_webhook_result {
+            let message_id = message.id.to_string();
+            store_user(message_id.as_str(), user_id.to_string().as_str()).await?;
+            InteractionIdStore::set(message.id, component.id).await?;
+            ComponentStore::del(user_id).await;
         }
     }
-
-    let webhook = webhook.await?;
-    let execute_webhook_handle = webhook.execute(&ctx.http, false, builder);
-    let delete_response_handle = component.delete_response(&ctx.http);
-    tokio::try_join!(execute_webhook_handle, delete_response_handle)?;
     Ok(())
 }
 
@@ -95,12 +103,16 @@ async fn get_embed(ctx: &SerenityContext, info: &WebhookDatas) -> CreateEmbed {
     let thumbnail = get_thumbnail(&mode);
     let mut embed = CreateEmbed::new()
         .color(BASE_COLOR)
+        .title(format!("({}/{})", info.joined.len(), info.max_member))
         .description(format!(
-            "## ({}/{}) {}\nサーバー：{}",
-            info.joined.len(),
-            info.max_member,
-            info.mode,
+            "サーバー：{}\nモード　：{}{}",
             info.ap_server,
+            info.mode,
+            if info.rank.is_empty() {
+                String::new()
+            } else {
+                format!("\nランク　：{}", info.rank)
+            }
         ))
         .field("参加者", names, false);
     if let Some(url) = thumbnail {
@@ -113,18 +125,20 @@ async fn get_embed(ctx: &SerenityContext, info: &WebhookDatas) -> CreateEmbed {
     embed
 }
 
-fn get_button() -> CreateButton {
-    let emoji =
-        dotenv_handler::get("JOIN_EMOJI").expect("[ FAILED ] JOIN_EMOJIが設定されていません");
-    let button = CreateButton::new("参加する")
+fn get_button() -> Vec<CreateButton> {
+    let join_button = CreateButton::new("参加する")
         .label("参加する")
         .style(ButtonStyle::Secondary)
-        .emoji(EmojiId::new(
-            emoji
-                .parse::<u64>()
-                .expect("[ FAILED ] JOIN_EMOJIのパースに失敗しました"),
-        ));
-    button
+        .emoji(ReactionType::Unicode("✋".to_string()));
+    let leave_button = CreateButton::new("参加をやめる")
+        .label("参加をやめる")
+        .style(ButtonStyle::Secondary)
+        .emoji(ReactionType::Unicode("👋".to_string()));
+    let delete_button = CreateButton::new("削除")
+        .label("削除")
+        .style(ButtonStyle::Secondary)
+        .emoji(ReactionType::Unicode("🚫".to_string()));
+    vec![join_button, leave_button, delete_button]
 }
 
 async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResult<Webhook> {
@@ -177,4 +191,9 @@ fn get_colour(rank: &str) -> Option<u32> {
         "レディアント" => Some(RADIANT_COLOR),
         _ => None,
     }
+}
+
+async fn store_user(message_id: &str, channel_id: &str) -> AnyhowResult<()> {
+    let redis_pass = dotenv_handler::get("REDIS_PASS")?;
+    Valkey::ttl_set(redis_pass.as_str(), message_id, channel_id, 259200).await
 }

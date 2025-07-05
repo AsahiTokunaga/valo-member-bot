@@ -1,20 +1,19 @@
 use anyhow::Result as AnyhowResult;
 use once_cell::sync::Lazy;
 use serenity::model::application::ComponentInteraction;
-use serenity::model::id::InteractionId;
-use serenity::model::id::UserId;
-use serenity::model::user::User;
+use serenity::model::id::{InteractionId, UserId, MessageId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub mod create;
+pub mod handler;
+pub mod edit;
 
 type Webhooks = Lazy<RwLock<HashMap<InteractionId, Arc<RwLock<WebhookDatas>>>>>;
 
 pub static WEBHOOKS: Webhooks = Lazy::new(|| RwLock::new(HashMap::new()));
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WebhookDatas {
     pub ap_server: String,
     pub mode: String,
@@ -22,10 +21,9 @@ pub struct WebhookDatas {
     pub max_member: u8,
     pub joined: Vec<UserId>,
 }
-
 impl WebhookDatas {
     pub async fn new(component: &ComponentInteraction) -> AnyhowResult<()> {
-        let mut map = WEBHOOKS.try_write()?;
+        let mut map = WEBHOOKS.write().await;
         map.insert(
             component.id,
             Arc::new(RwLock::new(WebhookDatas {
@@ -39,13 +37,12 @@ impl WebhookDatas {
         Ok(())
     }
 
-    pub async fn with_mute<F>(component: &ComponentInteraction, f: F) -> AnyhowResult<()>
+    pub async fn with_mute<F>(id: &InteractionId, f: F) -> AnyhowResult<()>
     where 
         F: FnOnce(&mut WebhookDatas),
     {
-        let id = component.id;
         let mut map = WEBHOOKS.write().await;
-        let mut webhook = if let Some(w) = map.get_mut(&id) {
+        let mut webhook = if let Some(w) = map.get_mut(id) {
             w.write().await
         } else {
             return Err(anyhow::anyhow!(
@@ -56,37 +53,49 @@ impl WebhookDatas {
         Ok(())
     }
 
-    pub async fn get(component: &ComponentInteraction) -> AnyhowResult<WebhookDatas> {
-        let id = component.id;
-        let map = WEBHOOKS.try_read()?;
-        if let Some(webhook) = map.get(&id) {
-            let webhook = webhook.read().await;
-            let response = WebhookDatas {
-                ap_server: webhook.ap_server.clone(),
-                mode: webhook.mode.clone(),
-                rank: webhook.rank.clone(),
-                max_member: webhook.max_member,
-                joined: webhook.joined.clone(),
-            };
-            Ok(response)
+    pub async fn get(id: &InteractionId) -> Option<Arc<serenity::prelude::RwLock<WebhookDatas>>> {
+        let map = WEBHOOKS.read().await;
+        map.get(id).cloned()
+    }
+    pub async fn del(id: &InteractionId) -> AnyhowResult<()> {
+        let mut map = WEBHOOKS.try_write()?;
+        if map.remove(id).is_none() {
+            return Err(anyhow::anyhow!(
+                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: del"
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub static INTERACTION_IDS: Lazy<RwLock<HashMap<MessageId, InteractionId>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+struct InteractionIdStore;
+
+impl InteractionIdStore {
+    pub async fn set(message_id: MessageId, interaction_id: InteractionId) -> AnyhowResult<()> {
+        let mut map = INTERACTION_IDS.write().await;
+        map.insert(message_id, interaction_id);
+        Ok(())
+    }
+    pub async fn get(message_id: MessageId) -> AnyhowResult<InteractionId> {
+        let map = INTERACTION_IDS.read().await;
+        if let Some(value) = map.get(&message_id) {
+            Ok(*value)
         } else {
             Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: get"
-            ))?
+                "[ FAILED ] MessageIdに対するInteractionIdが見つかりません: get"
+            ))
         }
     }
-    // TODO: webhookメッセージのボタンを押すと下記の関数で値が増加する
-    pub async fn _add_joined(component: &ComponentInteraction, user: &User) -> AnyhowResult<()> {
-        let id = component.id;
-        let mut map = WEBHOOKS.try_write()?;
-        let mut webhook = if let Some(webhook) = map.get_mut(&id) {
-            webhook.try_write()?
-        } else {
-            Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: add_joined"
-            ))?
-        };
-        webhook.joined.push(user.id);
+    pub async fn del(message_id: MessageId) -> AnyhowResult<()> {
+        let mut map = INTERACTION_IDS.write().await;
+        if map.remove(&message_id).is_none() {
+            return Err(anyhow::anyhow!(
+                "[ FAILED ] MessageIdに対するInteractionIdが見つかりません: del"
+            ));
+        }
         Ok(())
     }
 }
