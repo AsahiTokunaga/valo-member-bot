@@ -1,7 +1,7 @@
 use serenity::builder::{CreateActionRow, CreateInputText, CreateModal, CreateInteractionResponse};
 use serenity::model::application::InputTextStyle;
 
-pub async fn recruit_message() -> CreateInteractionResponse {
+pub fn recruit_message() -> CreateInteractionResponse {
     let action_row = vec![CreateActionRow::InputText(
         CreateInputText::new(
             InputTextStyle::Short,

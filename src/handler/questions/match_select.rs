@@ -3,9 +3,11 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-pub async fn q_match() -> EditInteractionResponse {
+use crate::handler::BASE_COLOR;
+
+pub fn q_match() -> EditInteractionResponse {
     let embed = CreateEmbed::new()
-        .colour(16732498)
+        .colour(BASE_COLOR)
         .title("募集形式を選択してください");
     let select_menu_kind = CreateSelectMenuKind::String {
         options: vec![

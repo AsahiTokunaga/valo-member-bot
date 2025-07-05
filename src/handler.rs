@@ -13,6 +13,18 @@ use questions::questions;
 mod webhook;
 use crate::handler::webhook::create::create as webhook_create;
 
+const PIN_MESSAGE_COLOR: u32 = 0xffffff;
+const BASE_COLOR: u32 = 0xff5152;
+const RADIANT_COLOR: u32 = 0xf9efa2;
+const IMMORTAL_COLOR: u32 = 0xbf334c;
+const ASCENDANT_COLOR: u32 = 0x1e8a51;
+const DIAMOND_COLOR: u32 = 0xc587f5;
+const PLATINUM_COLOR: u32 = 0x39a1b1;
+const GOLD_COLOR: u32 = 0xeabd44;
+const SILVER_COLOR: u32 = 0xd9e0dd;
+const BRONZE_COLOR: u32 = 0x865900;
+const IRON_COLOR: u32 = 0x4f4f4f;
+
 pub struct Handler;
 
 #[async_trait]
@@ -24,9 +36,7 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: SerenityContext, msg: Message) {
         println!("[ OK ] メッセージを受信しました");
         if msg.author.id.to_string()
-            != dotenv_handler::get("BOT_ID")
-                .await
-                .expect("[ FAILED ] BOT_IDが設定されていません")
+            != dotenv_handler::get("BOT_ID").expect("[ FAILED ] BOT_IDが設定されていません")
         {
             pin(ctx, &msg)
                 .await
@@ -40,9 +50,17 @@ impl EventHandler for Handler {
                 "[ OK ] インタラクションを受信しました: {}",
                 component.data.custom_id
             );
-            questions(ctx, component)
-                .await
-                .expect("[ FAILED ] インタラクションの処理に失敗しました");
+            match component.data.custom_id.as_str() {
+                "参加する" => webhook::handler::join(ctx, component).await
+                    .expect("[ FAILED ] 参加に失敗しました"),
+                "参加をやめる" => webhook::handler::leave(ctx, component).await
+                    .expect("[ FAILED ] 参加の取り消しに失敗しました"),
+                "削除" => webhook::handler::delete(ctx, component).await
+                    .expect("[ FAILED ] Webhookの削除に失敗しました"),
+                _ => questions(ctx, component)
+                    .await
+                    .expect("[ FAILED ] インタラクションの処理に失敗しました")
+            }
         } else if let Interaction::Modal(modal) = interaction {
             modal
                 .defer(&ctx.http)

@@ -6,12 +6,12 @@ mod server_select;
 use server_select::server;
 mod match_select;
 use match_select::q_match;
-pub mod component_handler;
-use component_handler::ComponentHandler;
+pub mod component_store;
+use component_store::ComponentStore;
 mod member_select;
 use member_select::member;
 mod recruit_message;
-use crate::handler::webhook::WebhookHandler;
+use crate::handler::webhook::WebhookDatas;
 use recruit_message::recruit_message;
 mod rank_select;
 use rank_select::rank;
@@ -19,10 +19,30 @@ use rank_select::rank;
 pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) -> AnyhowResult<()> {
     match component.data.custom_id.as_str() {
         "募集を作成" => {
-            ComponentHandler::set(&component).await;
-            WebhookHandler::new(&component).await?;
-            let question = server().await;
-            component.create_response(&ctx.http, question).await?;
+            let question = server();
+            let case = &component.data.custom_id;
+            let component_set_task = ComponentStore::set(&component);
+            let webhook_data_init_task = WebhookDatas::new(&component);
+            let create_response_task = component.create_response(&ctx.http, question);
+            let (_, webhook_data_init, create_response) = tokio::join!(
+                component_set_task,
+                webhook_data_init_task,
+                create_response_task
+            );
+            match (webhook_data_init, create_response) {
+                (Ok(_), Ok(_)) => {
+                    println!("[ OK ] インタラクションを正常に終了しました: {}", case);
+                }
+                (_, Err(e)) => {
+                    eprintln!(
+                        "[ FAILED ] インタラクションに対するレスポンスの送信に失敗しました: {}",
+                        e
+                    );
+                }
+                (Err(e), _) => {
+                    eprintln!("[ FAILED ] WebhookDatasの初期化に失敗しました: {}", e);
+                }
+            }
         }
         "サーバーを選択" => {
             component.defer(&ctx.http).await?;
@@ -34,10 +54,26 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             } else {
                 "Tokyo/東京".to_string()
             };
-            if let Some(component) = ComponentHandler::get(user_id).await {
-                let question = q_match().await;
-                component.edit_response(&ctx.http, question).await?;
-                WebhookHandler::set_ap_server(&component, ap_server).await?;
+            let question = q_match();
+            let component = ComponentStore::get(user_id).await;
+            let edit_response_task = component.edit_response(&ctx.http, question);
+            let webhook_data_set_task =
+                WebhookDatas::with_mute(&component.id, |w| w.ap_server = ap_server);
+            let (webhook_data_set, edit_response) =
+                tokio::join!(webhook_data_set_task, edit_response_task);
+            match (webhook_data_set, edit_response) {
+                (Ok(_), Ok(_)) => {
+                    println!("[ OK ] インタラクションを正常に終了しました: サーバーを選択");
+                }
+                (_, Err(e)) => {
+                    eprintln!(
+                        "[ FAILED ] インタラクションに対するレスポンスの送信に失敗しました: {}",
+                        e
+                    );
+                }
+                (Err(e), _) => {
+                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                }
             }
         }
         "募集形式を選択" => {
@@ -50,26 +86,36 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             } else {
                 "アンレート"
             };
-            let component = if let Some(component) = ComponentHandler::get(user_id).await {
-                component
+            let component = ComponentStore::get(user_id).await;
+            let webhook_data_set_task =
+                WebhookDatas::with_mute(&component.id, |w| w.mode = mode.to_string());
+            let edit_resuponse_task = if mode == "アンレート" || mode == "カスタム" {
+                let question = member(mode.to_string());
+                component.edit_response(&ctx.http, question)
             } else {
-                return Err(anyhow::anyhow!(
-                    "[ FAILED ] 募集の作成に失敗しました: ユーザーのコンポーネントが見つかりません"
-                ));
+                let question = rank();
+                component.edit_response(&ctx.http, question)
             };
-            if mode == "アンレート" || mode == "カスタム" {
-                let question = member(&mode).await;
-                component.edit_response(&ctx.http, question).await?;
-                WebhookHandler::set_mode(&component, &mode).await?;
-            } else {
-                let question = rank().await;
-                component.edit_response(&ctx.http, question).await?;
-                WebhookHandler::set_mode(&component, &mode).await?;
+            let (webhook_data_set, edit_response) =
+                tokio::join!(webhook_data_set_task, edit_resuponse_task);
+            match (webhook_data_set, edit_response) {
+                (Ok(_), Ok(_)) => {
+                    println!("[ OK ] インタラクションを正常に終了しました: 募集形式を選択");
+                }
+                (_, Err(e)) => {
+                    eprintln!(
+                        "[ FAILED ] インタラクションに対するレスポンスの送信に失敗しました: {}",
+                        e
+                    );
+                }
+                (Err(e), _) => {
+                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                }
             }
         }
         "募集人数を選択" => {
             let user_id = component.user.id;
-            let question = recruit_message().await;
+            let question = recruit_message();
             let party = if let ComponentInteractionDataKind::StringSelect { values } =
                 &component.data.kind
             {
@@ -78,14 +124,10 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 "フルパ"
             };
             let max_member: u8 = match party {
-                "デュオ" => 2,
-                "トリオ" => 3,
-                "クアッド" => 4,
-                "フルパ" => 5,
-                "2人" => 2,
-                "3人" => 3,
-                "4人" => 4,
-                "5人" => 5,
+                "デュオ" | "2人" => 2,
+                "トリオ" | "3人" => 3,
+                "クアッド" | "4人" => 4,
+                "フルパ" | "5人" => 5,
                 "6人" => 6,
                 "7人" => 7,
                 "8人" => 8,
@@ -93,9 +135,25 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 "10人" => 10,
                 _ => 5,
             };
-            component.create_response(&ctx.http, question).await?;
-            if let Some(component) = ComponentHandler::get(user_id).await {
-                WebhookHandler::set_max_member(&component, max_member).await?;
+            let create_resuponse_task = component.create_response(&ctx.http, question);
+            let component = ComponentStore::get(user_id).await;
+            let webhook_data_set_task =
+                WebhookDatas::with_mute(&component.id, |w| w.max_member = max_member);
+            let (webhook_data_set, create_response) =
+                tokio::join!(webhook_data_set_task, create_resuponse_task);
+            match (webhook_data_set, create_response) {
+                (Ok(_), Ok(_)) => {
+                    println!("[ OK ] インタラクションを正常に終了しました: 募集人数を選択");
+                }
+                (_, Err(e)) => {
+                    eprintln!(
+                        "[ FAILED ] インタラクションに対するレスポンスの送信に失敗しました: {}",
+                        e
+                    );
+                }
+                (Err(e), _) => {
+                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                }
             }
         }
         "ランクを選択" => {
@@ -108,16 +166,27 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             } else {
                 "どこでも"
             };
-            let component = if let Some(component) = ComponentHandler::get(user_id).await {
-                component
-            } else {
-                return Err(anyhow::anyhow!(
-                    "[ FAILED ] 募集の作成に失敗しました: ユーザーのコンポーネントが見つかりません"
-                ));
-            };
-            WebhookHandler::set_rank(&component, rank).await?;
-            let question = member(&rank).await;
-            component.edit_response(&ctx.http, question).await?;
+            let question = member(rank.to_string());
+            let component = ComponentStore::get(user_id).await;
+            let edit_response_task = component.edit_response(&ctx.http, question);
+            let webhook_data_set_task =
+                WebhookDatas::with_mute(&component.id, |w| w.rank = rank.to_string());
+            let (webhook_data_set, edit_response) =
+                tokio::join!(webhook_data_set_task, edit_response_task);
+            match (webhook_data_set, edit_response) {
+                (Ok(_), Ok(_)) => {
+                    println!("[ OK ] インタラクションを正常に終了しました: ランクを選択");
+                }
+                (_, Err(e)) => {
+                    eprintln!(
+                        "[ FAILED ] インタラクションに対するレスポンスの送信に失敗しました: {}",
+                        e
+                    );
+                }
+                (Err(e), _) => {
+                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                }
+            }
         }
         _ => {}
     }
