@@ -9,8 +9,7 @@ use serenity::client::Context as SerenityContext;
 use serenity::model::application::ActionRowComponent;
 use serenity::model::application::ButtonStyle;
 use serenity::model::application::ModalInteraction;
-use serenity::model::id::ChannelId;
-use serenity::model::id::UserId;
+use serenity::model::id::{ChannelId, MessageId, UserId};
 use serenity::model::webhook::Webhook;
 use std::str::FromStr;
 
@@ -72,10 +71,20 @@ pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowRes
         let (execute_webhook_result, _) =
             tokio::try_join!(execute_webhook_handle, delete_response_handle)?;
         if let Some(message) = execute_webhook_result {
-            let message_id = message.id.to_string();
-            store_user(message_id.as_str(), user_id.to_string().as_str()).await?;
-            InteractionIdStore::set(message.id, component.id).await?;
-            ComponentStore::del(user_id).await;
+            let (s, i, _) = tokio::join!(
+                store_user(message.id, user_id),
+                InteractionIdStore::set(message.id, component.id),
+                ComponentStore::del(user_id)
+            );
+            match (s, i) {
+                (Ok(()), Ok(())) => {}
+                (Err(e), _) => {
+                    eprintln!("[ FAILED ] MessageIdに対するUserIdの保存に失敗しました: {}", e);
+                }
+                (_, Err(e)) => {
+                    eprintln!("[ FAILED ] インタラクションIDの保存に失敗しました: {}", e);
+                }
+            }
         }
     }
     Ok(())
@@ -193,7 +202,13 @@ fn get_colour(rank: &str) -> Option<u32> {
     }
 }
 
-async fn store_user(message_id: &str, channel_id: &str) -> AnyhowResult<()> {
+async fn store_user(message_id: MessageId, user_id: UserId) -> AnyhowResult<()> {
     let redis_pass = dotenv_handler::get("REDIS_PASS")?;
-    Valkey::ttl_set(redis_pass.as_str(), message_id, channel_id, 259200).await
+    Valkey::ttl_set(
+        redis_pass.as_str(),
+        message_id.to_string().as_str(),
+        user_id.to_string().as_str(),
+        259200,
+    )
+    .await
 }
