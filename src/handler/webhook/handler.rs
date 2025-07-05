@@ -187,26 +187,15 @@ async fn update_webhook_data(
     match p_r {
         'p' => {
             WebhookDatas::with_mute(interaction_id, |w| {
-                w.joined.push(user_id);
+                w.joined.insert(user_id);
             })
             .await
         }
         'r' => {
-            let data = WebhookDatas::get(interaction_id).await;
-            if let Some(webhook_data) = data {
-                let webhook_data = webhook_data.read().await;
-                let index = webhook_data
-                    .joined
-                    .iter()
-                    .position(|&id| id == user_id)
-                    .unwrap(); // この関数を呼ぶ時点でOptionの安全性を保障
-                drop(webhook_data);
-                WebhookDatas::with_mute(interaction_id, |w| {
-                    w.joined.remove(index);
-                })
-                .await?;
-            }
-            Ok(())
+            WebhookDatas::with_mute(interaction_id, |w| {
+                w.joined.remove(&user_id);
+            })
+            .await
         }
         _ => {
             return Err(anyhow::anyhow!("I'm a teapot"));

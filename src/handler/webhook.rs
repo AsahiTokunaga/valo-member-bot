@@ -2,7 +2,7 @@ use anyhow::Result as AnyhowResult;
 use once_cell::sync::Lazy;
 use serenity::model::application::ComponentInteraction;
 use serenity::model::id::{InteractionId, UserId, MessageId};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -13,13 +13,13 @@ pub mod edit;
 type Webhooks = Lazy<RwLock<HashMap<InteractionId, Arc<RwLock<WebhookDatas>>>>>;
 
 pub static WEBHOOKS: Webhooks = Lazy::new(|| RwLock::new(HashMap::new()));
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WebhookDatas {
     pub ap_server: String,
     pub mode: String,
     pub rank: String,
     pub max_member: u8,
-    pub joined: Vec<UserId>,
+    pub joined: HashSet<UserId>,
 }
 impl WebhookDatas {
     pub async fn new(component: &ComponentInteraction) -> AnyhowResult<()> {
@@ -31,7 +31,7 @@ impl WebhookDatas {
                 mode: String::new(),
                 rank: String::new(),
                 max_member: 0,
-                joined: vec![component.user.id],
+                joined: HashSet::from([component.user.id]),
             })),
         );
         Ok(())
@@ -53,7 +53,7 @@ impl WebhookDatas {
         Ok(())
     }
 
-    pub async fn get(id: &InteractionId) -> Option<Arc<serenity::prelude::RwLock<WebhookDatas>>> {
+    pub async fn get(id: &InteractionId) -> Option<Arc<RwLock<WebhookDatas>>> {
         let map = WEBHOOKS.read().await;
         map.get(id).cloned()
     }
