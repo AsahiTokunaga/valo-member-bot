@@ -20,14 +20,14 @@ pub async fn edit(
     let webhook_url = Valkey::get(&redis_pass, &channel_id).await?.unwrap();
     let webhook = Webhook::from_url(&ctx.http, &webhook_url).await?;
     let prev = webhook.get_message(&ctx.http, None, message_id).await?;
-    let wh_message = EditWebhookMessage::new().embed(edit_embed(prev, field_value, title));
+    let wh_message = EditWebhookMessage::new().embed(get_embed(prev, field_value, title));
     webhook
         .edit_message(&ctx.http, message_id, wh_message)
         .await?;
     Ok(())
 }
 
-fn edit_embed(message: Message, field_value: &str, title: (&usize, &u8)) -> CreateEmbed {
+fn get_embed(message: Message, field_value: &str, title: (&usize, &u8)) -> CreateEmbed {
     let embed = message.embeds.first().unwrap();
     let field = embed.fields.first().unwrap();
     CreateEmbed::new()
