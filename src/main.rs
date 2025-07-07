@@ -7,6 +7,7 @@ use handler::Handler;
 mod valkey;
 use valkey::commands;
 mod dotenv_handler;
+mod state_handler;
 
 #[tokio::main]
 async fn main() -> AnyhowResult<()> {

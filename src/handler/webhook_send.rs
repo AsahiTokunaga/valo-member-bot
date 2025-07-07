@@ -18,8 +18,8 @@ use crate::handler::colors::{
     ASCENDANT_COLOR, BASE_COLOR, BRONZE_COLOR, DIAMOND_COLOR, GOLD_COLOR, IMMORTAL_COLOR,
     IRON_COLOR, PLATINUM_COLOR, RADIANT_COLOR, SILVER_COLOR,
 };
-use crate::handler::questions::component_store::ComponentStore;
-use crate::handler::webhook::{InteractionIdStore, WebhookData};
+use crate::state_handler::methods::{component_store_map, interaction_id_map, webhook_map};
+use crate::state_handler::WebhookData;
 use crate::valkey::commands;
 
 pub async fn send(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
@@ -44,44 +44,48 @@ pub async fn send(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResul
     let button = get_button();
     let action_row = CreateActionRow::Buttons(button);
     let webhook = get_webhook(ctx, channel_id);
-    let component = ComponentStore::get(user_id).await;
-    let data = WebhookData::get(&component.id).await;
-    if let Some(webhook_data) = data {
-        let webhook_data = webhook_data.read().await;
-        let embed = get_embed(ctx, &webhook_data);
-        let mut builder = ExecuteWebhook::new()
-            .avatar_url(user_avatar)
-            .username(user_name)
-            .embed(embed.await)
-            .components(vec![action_row]);
-        drop(webhook_data);
-        if let Some(content) = content {
+    let component = component_store_map::get(&ctx, &user_id).await;
+    if let Some(component) = component {
+        let component = component.read().await;
+        let data = webhook_map::get(&ctx, &component.id).await;
+        if let Some(webhook_data) = data {
+            let webhook_data = webhook_data.read().await;
+            let embed = get_embed(ctx, &webhook_data);
+            let mut builder = ExecuteWebhook::new()
+                .avatar_url(user_avatar)
+                .username(user_name)
+                .embed(embed.await)
+                .components(vec![action_row]);
+            drop(webhook_data);
             if let Some(content) = content {
-                builder = builder.content(content);
-            }
-        }
-
-        let webhook = webhook.await?;
-        let execute_webhook_handle = webhook.execute(&ctx.http, true, builder);
-        let delete_response_handle = component.delete_response(&ctx.http);
-        let (execute_webhook_result, _) =
-            tokio::try_join!(execute_webhook_handle, delete_response_handle)?;
-        if let Some(message) = execute_webhook_result {
-            let (s, i, _) = tokio::join!(
-                store_user(message.id, user_id),
-                InteractionIdStore::set(message.id, component.id),
-                ComponentStore::del(user_id)
-            );
-            match (s, i) {
-                (Ok(()), Ok(())) => {}
-                (Err(e), _) => {
-                    eprintln!(
-                        "[ FAILED ] MessageIdに対するUserIdの保存に失敗しました: {}",
-                        e
-                    );
+                if let Some(content) = content {
+                    builder = builder.content(content);
                 }
-                (_, Err(e)) => {
-                    eprintln!("[ FAILED ] インタラクションIDの保存に失敗しました: {}", e);
+            }
+
+            let webhook = webhook.await?;
+            let execute_webhook_handle = webhook.execute(&ctx.http, true, builder);
+            let delete_response_handle = component.delete_response(&ctx.http);
+            let (execute_webhook_result, _) =
+                tokio::try_join!(execute_webhook_handle, delete_response_handle)?;
+            if let Some(message) = execute_webhook_result {
+                let (s, i, _) = tokio::join!(
+                    store_user(message.id, user_id),
+                    interaction_id_map::set(&ctx, message.id, component.id),
+                    component_store_map::del(&ctx, &user_id)
+                );
+                drop(component);
+                match (s, i) {
+                    (Ok(()), Ok(())) => {}
+                    (Err(e), _) => {
+                        eprintln!(
+                            "[ FAILED ] MessageIdに対するUserIdの保存に失敗しました: {}",
+                            e
+                        );
+                    }
+                    (_, Err(e)) => {
+                        eprintln!("[ FAILED ] インタラクションIDの保存に失敗しました: {}", e);
+                    }
                 }
             }
         }

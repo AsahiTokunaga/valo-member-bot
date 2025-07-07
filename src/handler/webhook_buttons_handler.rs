@@ -14,28 +14,31 @@ use serenity::model::id::{InteractionId, MessageId, UserId};
 use serenity::model::webhook::Webhook;
 
 use crate::dotenv_handler;
-use crate::handler::webhook::edit::edit;
-use crate::handler::webhook::{InteractionIdStore, WebhookData};
+use crate::handler::webhook_edit::edit;
+use crate::state_handler::methods::{
+    webhook_map, interaction_id_map
+};
+use crate::state_handler::WebhookData;
 use crate::valkey::commands;
 
 pub async fn join(ctx: SerenityContext, component: ComponentInteraction) -> AnyhowResult<()> {
     let enter_join_user = component.user.id;
     let message_id = component.message.id;
-    let interaction_id = if let Ok(id) = InteractionIdStore::get(message_id).await {
+    let interaction_id = if let Ok(id) = interaction_id_map::get(&ctx, &message_id).await {
         id
     } else {
         timeout(&ctx.http, &component).await?;
         return Ok(());
     };
-    let data = WebhookData::get(&interaction_id).await;
+    let data = webhook_map::get(&ctx, &interaction_id).await;
     if let Some(webhook_data) = data {
         let webhook_data = webhook_data.read().await;
         if webhook_data.joined.contains(&enter_join_user) {
             response(&ctx.http, &component, "すでに募集に参加しています", true).await?;
         } else {
             drop(webhook_data);
-            update_webhook_data(&interaction_id, enter_join_user, 'p').await?;
-            let webhook_data = WebhookData::get(&interaction_id).await.unwrap();
+            update_webhook_data(&ctx, &interaction_id, enter_join_user, 'p').await?;
+            let webhook_data = webhook_map::get(&ctx, &interaction_id).await.unwrap();
             let webhook_data = webhook_data.read().await;
             let names = get_field_value(&webhook_data).await;
             let title: (&usize, &u8) = (&webhook_data.joined.len(), &webhook_data.max_member);
@@ -72,13 +75,13 @@ pub async fn leave(ctx: SerenityContext, component: ComponentInteraction) -> Any
     let linked_message_user = commands::get(&redis_pass, message_id.to_string().as_str()).await?;
     if let Some(user) = linked_message_user {
         let linked_message_user_id = UserId::from_str(&user)?;
-        let interaction_id = if let Ok(id) = InteractionIdStore::get(message_id).await {
+        let interaction_id = if let Ok(id) = interaction_id_map::get(&ctx, &message_id).await {
             id
         } else {
             timeout(&ctx.http, &component).await?;
             return Ok(());
         };
-        let data = WebhookData::get(&interaction_id).await;
+        let data = webhook_map::get(&ctx, &interaction_id).await;
         if let Some(webhook_data) = data {
             let webhook_data = webhook_data.read().await;
             if linked_message_user_id == enter_leave_user {
@@ -86,8 +89,8 @@ pub async fn leave(ctx: SerenityContext, component: ComponentInteraction) -> Any
             } else {
                 if webhook_data.joined.contains(&enter_leave_user) {
                     drop(webhook_data);
-                    update_webhook_data(&interaction_id, enter_leave_user, 'r').await?;
-                    let webhook_data = WebhookData::get(&interaction_id).await.unwrap();
+                    update_webhook_data(&ctx, &interaction_id, enter_leave_user, 'r').await?;
+                    let webhook_data = webhook_map::get(&ctx, &interaction_id).await.unwrap();
                     let webhook_data = webhook_data.read().await;
                     let names = get_field_value(&webhook_data).await;
                     let title: (&usize, &u8) =
@@ -139,10 +142,10 @@ pub async fn delete(ctx: SerenityContext, component: ComponentInteraction) -> An
                 .delete_message(&ctx.http, component.message.id)
                 .await
                 .context("[ FAILED ] メッセージの削除に失敗しました")?;
-            let interaction_id = InteractionIdStore::get(component.message.id).await?;
+            let interaction_id = interaction_id_map::get(&ctx, &component.message.id).await?;
             let (w, i) = tokio::join!(
-                WebhookData::del(&interaction_id),
-                InteractionIdStore::del(component.message.id)
+                webhook_map::del(&ctx, &interaction_id),
+                interaction_id_map::del(&ctx, &component.message.id)
             );
             match (w, i) {
                 (Ok(()), Ok(())) => {}
@@ -193,19 +196,20 @@ async fn response<T: CacheHttp>(
 }
 
 async fn update_webhook_data(
+    ctx: &SerenityContext,
     interaction_id: &InteractionId,
     user_id: UserId,
     p_r: char,
 ) -> AnyhowResult<()> {
     match p_r {
         'p' => {
-            WebhookData::with_mute(interaction_id, |w| {
+            webhook_map::with_mute(ctx, interaction_id, |w| {
                 w.joined.insert(user_id);
             })
             .await
         }
         'r' => {
-            WebhookData::with_mute(interaction_id, |w| {
+            webhook_map::with_mute(ctx, interaction_id, |w| {
                 w.joined.remove(&user_id);
             })
             .await
