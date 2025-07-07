@@ -1,12 +1,15 @@
+use std::str::FromStr;
+
 use crate::state_handler::methods::{component_store_map, webhook_map};
+use crate::state_handler::{APServer, Mode, Rank};
 use anyhow::Result as AnyhowResult;
 use serenity::client::Context as SerenityContext;
 use serenity::model::application::ComponentInteraction;
 use serenity::model::application::ComponentInteractionDataKind;
 mod server_select;
 use server_select::server;
-mod match_select;
-use match_select::q_match;
+mod mode_select;
+use mode_select::q_match;
 mod member_select;
 use member_select::member;
 mod recruit_message;
@@ -29,9 +32,9 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let ap_server = if let ComponentInteractionDataKind::StringSelect { values } =
                 &component.data.kind
             {
-                values.get(0).cloned().unwrap()
+                APServer::from_str(&values.get(0).unwrap()).ok()
             } else {
-                "Tokyo/東京".to_string()
+                None
             };
             let question = q_match();
             let component = component_store_map::get(&ctx, &user_id).await;
@@ -39,7 +42,12 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                 let component = component.read().await;
                 let interaction_id = &component.id;
                 component.edit_response(&ctx.http, question).await?;
-                webhook_map::with_mute(&ctx, interaction_id, |w| w.ap_server = ap_server).await?;
+                if ap_server.is_some() {
+                    webhook_map::with_mute(&ctx, interaction_id, |w| {
+                        w.ap_server = ap_server.unwrap()
+                    })
+                    .await?;
+                }
                 drop(component);
             }
         }
@@ -49,21 +57,26 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let mode = if let ComponentInteractionDataKind::StringSelect { values } =
                 &component.data.kind
             {
-                &values.get(0).unwrap()
+                Mode::from_str(&values.get(0).unwrap()).ok()
             } else {
-                "アンレート"
+                None
             };
             let component = component_store_map::get(&ctx, &user_id).await;
             if let Some(component) = component {
                 let component = component.read().await;
-                webhook_map::with_mute(&ctx, &component.id, |w| w.mode = mode.to_string()).await?;
-                if mode == "アンレート" || mode == "カスタム" {
-                    let question = member(mode.to_string());
-                    component.edit_response(&ctx.http, question).await?;
-                } else {
-                    let question = rank();
-                    component.edit_response(&ctx.http, question).await?;
-                };
+                if mode.is_some() {
+                    webhook_map::with_mute(&ctx, &component.id, |w| w.mode = mode.unwrap()).await?;
+                    if mode.unwrap() == Mode::Unrated
+                        || mode.unwrap() == Mode::Custom
+                        || mode.is_none()
+                    {
+                        let question = member(mode.unwrap());
+                        component.edit_response(&ctx.http, question).await?;
+                    } else {
+                        let question = rank();
+                        component.edit_response(&ctx.http, question).await?;
+                    };
+                }
                 drop(component);
             }
         }
@@ -103,16 +116,18 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let rank = if let ComponentInteractionDataKind::StringSelect { values } =
                 &component.data.kind
             {
-                &values.get(0).unwrap()
+                Rank::from_str(&values.get(0).unwrap()).ok()
             } else {
-                "どこでも"
+                None
             };
-            let question = member(rank.to_string());
+            let question = member(Mode::Competitive);
             let component = component_store_map::get(&ctx, &user_id).await;
             if let Some(component) = component {
                 let component = component.read().await;
                 component.edit_response(&ctx.http, question).await?;
-                webhook_map::with_mute(&ctx, &component.id, |w| w.rank = rank.to_string()).await?;
+                if rank.is_some() {
+                    webhook_map::with_mute(&ctx, &component.id, |w| w.rank = rank).await?;
+                }
                 drop(component);
             }
         }

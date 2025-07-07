@@ -5,40 +5,35 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-use crate::handler::colors::BASE_COLOR;
+use crate::{handler::colors::BASE_COLOR, state_handler::{
+    MaxMember::{Duo, Eight, Five, Nine, Quad, Seven, Six, Ten, Trio}, Mode::{self, Competitive, Custom, Unrated}}};
 
-pub fn member(mode: String) -> EditInteractionResponse {
+pub fn member(mode: Mode) -> EditInteractionResponse {
     let embed = CreateEmbed::new()
             .colour(BASE_COLOR)
             .title("募集人数を選択してください");
-    let select_menu_vec = match mode.as_str() {
-            "アンレート" => vec![
-                CreateSelectMenuOption::new("デュオ", "デュオ"),
-                CreateSelectMenuOption::new("トリオ", "トリオ"),
-                CreateSelectMenuOption::new("クアッド", "クアッド"),
-                CreateSelectMenuOption::new("フルパ", "フルパ"),
+    let select_menu_vec = match mode {
+            Unrated => vec![
+                CreateSelectMenuOption::new(Duo.to_string(), Duo.to_string()),
+                CreateSelectMenuOption::new(Trio.to_string(), Trio.to_string()),
+                CreateSelectMenuOption::new(Quad.to_string(), Quad.to_string()),
+                CreateSelectMenuOption::new(Five.to_string(), Five.to_string()),
             ],
-            "コンペティティブ" => vec![
-                CreateSelectMenuOption::new("デュオ", "デュオ"),
-                CreateSelectMenuOption::new("トリオ", "トリオ"),
-                CreateSelectMenuOption::new("フルパ", "フルパ"),
+            Competitive => vec![
+                CreateSelectMenuOption::new(Duo.to_string(), Duo.to_string()),
+                CreateSelectMenuOption::new(Trio.to_string(), Trio.to_string()),
+                CreateSelectMenuOption::new(Five.to_string(), Five.to_string()),
             ],
-            "カスタム" => vec![
-                CreateSelectMenuOption::new("2人", "2人"),
-                CreateSelectMenuOption::new("3人", "3人"),
-                CreateSelectMenuOption::new("4人", "4人"),
-                CreateSelectMenuOption::new("5人", "5人"),
-                CreateSelectMenuOption::new("6人", "6人"),
-                CreateSelectMenuOption::new("7人", "7人"),
-                CreateSelectMenuOption::new("8人", "8人"),
-                CreateSelectMenuOption::new("9人", "9人"),
-                CreateSelectMenuOption::new("10人", "10人"),
-            ],
-            "どこでも" => vec![CreateSelectMenuOption::new("フルパ", "フルパ")],
-            _ => vec![
-                CreateSelectMenuOption::new("デュオ", "デュオ"),
-                CreateSelectMenuOption::new("トリオ", "トリオ"),
-                CreateSelectMenuOption::new("フルパ", "フルパ"),
+            Custom => vec![
+                CreateSelectMenuOption::new(Duo.to_string(), Duo.to_string()),
+                CreateSelectMenuOption::new(Trio.to_string(), Trio.to_string()),
+                CreateSelectMenuOption::new(Quad.to_string(), Quad.to_string()),
+                CreateSelectMenuOption::new(Five.to_string(), Five.to_string()),
+                CreateSelectMenuOption::new(Six.to_string(), Six.to_string()),
+                CreateSelectMenuOption::new(Seven.to_string(), Seven.to_string()),
+                CreateSelectMenuOption::new(Eight.to_string(), Eight.to_string()),
+                CreateSelectMenuOption::new(Nine.to_string(), Nine.to_string()),
+                CreateSelectMenuOption::new(Ten.to_string(), Ten.to_string()),
             ],
         };
 

@@ -19,7 +19,7 @@ use crate::handler::colors::{
     IRON_COLOR, PLATINUM_COLOR, RADIANT_COLOR, SILVER_COLOR,
 };
 use crate::state_handler::methods::{component_store_map, interaction_id_map, webhook_map};
-use crate::state_handler::WebhookData;
+use crate::state_handler::{Mode, Rank, WebhookData};
 use crate::valkey::commands;
 
 pub async fn send(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
@@ -93,8 +93,8 @@ pub async fn send(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResul
     Ok(())
 }
 
-async fn get_embed(ctx: &SerenityContext, info: &WebhookData) -> CreateEmbed {
-    let mut users = info
+async fn get_embed(ctx: &SerenityContext, webhook_data: &WebhookData) -> CreateEmbed {
+    let mut users = webhook_data
         .joined
         .iter()
         .map(|user_id| user_id.to_user(&ctx.http))
@@ -105,25 +105,24 @@ async fn get_embed(ctx: &SerenityContext, info: &WebhookData) -> CreateEmbed {
             names_vec.push(user.to_string());
         }
     }
-
     let names = names_vec.join("\n");
-    let mode = match info.mode.as_str() {
-        "コンペティティブ" => &info.rank,
-        _ => &info.mode,
-    };
-    let colour = get_colour(&info.rank);
-    let thumbnail = get_thumbnail(&mode);
+    let colour = get_color(webhook_data);
+    let thumbnail = get_thumbnail(webhook_data);
     let mut embed = CreateEmbed::new()
         .color(BASE_COLOR)
-        .title(format!("({}/{})", info.joined.len(), info.max_member))
+        .title(format!(
+            "({}/{})",
+            webhook_data.joined.len(),
+            webhook_data.max_member
+        ))
         .description(format!(
             "サーバー：{}\nモード　：{}{}",
-            info.ap_server,
-            info.mode,
-            if info.rank.is_empty() {
+            webhook_data.ap_server,
+            webhook_data.mode,
+            if webhook_data.rank.is_none() {
                 String::new()
             } else {
-                format!("\nランク　：{}", info.rank)
+                format!("\nランク　：{}", webhook_data.rank.unwrap().to_string())
             }
         ))
         .field("参加者", names, false);
@@ -169,36 +168,44 @@ async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResu
     Ok(builder)
 }
 
-fn get_thumbnail(rank: &str) -> Option<String> {
+fn get_thumbnail(webhook_data: &WebhookData) -> Option<String> {
     let base_img_url = dotenv_handler::get("BASE_IMG_URL").unwrap_or(String::new());
-    match rank {
-        "レディアント" => Some(format!("{}radiant.png", base_img_url)),
-        "イモータル" => Some(format!("{}immortal.png", base_img_url)),
-        "アセンダント" => Some(format!("{}ascendant.png", base_img_url)),
-        "ダイヤモンド" => Some(format!("{}diamond.png", base_img_url)),
-        "プラチナ" => Some(format!("{}platinum.png", base_img_url)),
-        "ゴールド" => Some(format!("{}gold.png", base_img_url)),
-        "シルバー" => Some(format!("{}silver.png", base_img_url)),
-        "ブロンズ" => Some(format!("{}bronze.png", base_img_url)),
-        "アイアン" => Some(format!("{}iron.png", base_img_url)),
-        "どこでも" => Some(format!("{}unranked.png", base_img_url)),
-        "アンレート" => Some(format!("{}unrated.png", base_img_url)),
-        _ => None,
+    if let Some(rank) = &webhook_data.rank {
+        match rank {
+            Rank::Radiant => Some(format!("{}radiant.png", base_img_url)),
+            Rank::Immortal => Some(format!("{}immortal.png", base_img_url)),
+            Rank::Ascendant => Some(format!("{}ascendant.png", base_img_url)),
+            Rank::Diamond => Some(format!("{}diamond.png", base_img_url)),
+            Rank::Platinum => Some(format!("{}platinum.png", base_img_url)),
+            Rank::Gold => Some(format!("{}gold.png", base_img_url)),
+            Rank::Silver => Some(format!("{}silver.png", base_img_url)),
+            Rank::Bronze => Some(format!("{}bronze.png", base_img_url)),
+            Rank::Iron => Some(format!("{}iron.png", base_img_url)),
+            Rank::Unranked => Some(format!("{}unranked.png", base_img_url)),
+        }
+    } else if webhook_data.mode == Mode::Unrated {
+        Some(format!("{}unrated.png", base_img_url))
+    } else {
+        None
     }
 }
 
-fn get_colour(rank: &str) -> Option<u32> {
-    match rank {
-        "アイアン" => Some(IRON_COLOR),
-        "ブロンズ" => Some(BRONZE_COLOR),
-        "シルバー" => Some(SILVER_COLOR),
-        "ゴールド" => Some(GOLD_COLOR),
-        "プラチナ" => Some(PLATINUM_COLOR),
-        "ダイヤモンド" => Some(DIAMOND_COLOR),
-        "アセンダント" => Some(ASCENDANT_COLOR),
-        "イモータル" => Some(IMMORTAL_COLOR),
-        "レディアント" => Some(RADIANT_COLOR),
-        _ => None,
+fn get_color(webhook_data: &WebhookData) -> Option<u32> {
+    if let Some(rank) = &webhook_data.rank {
+        match rank {
+            Rank::Iron => Some(IRON_COLOR),
+            Rank::Bronze => Some(BRONZE_COLOR),
+            Rank::Silver => Some(SILVER_COLOR),
+            Rank::Gold => Some(GOLD_COLOR),
+            Rank::Platinum => Some(PLATINUM_COLOR),
+            Rank::Diamond => Some(DIAMOND_COLOR),
+            Rank::Ascendant => Some(ASCENDANT_COLOR),
+            Rank::Immortal => Some(IMMORTAL_COLOR),
+            Rank::Radiant => Some(RADIANT_COLOR),
+            Rank::Unranked => None,
+        }
+    } else {
+        None
     }
 }
 

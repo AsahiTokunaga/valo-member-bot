@@ -3,7 +3,7 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-use crate::handler::colors::BASE_COLOR;
+use crate::{handler::colors::BASE_COLOR, state_handler::Mode};
 
 pub fn q_match() -> EditInteractionResponse {
     let embed = CreateEmbed::new()
@@ -11,9 +11,12 @@ pub fn q_match() -> EditInteractionResponse {
         .title("募集形式を選択してください");
     let select_menu_kind = CreateSelectMenuKind::String {
         options: vec![
-            CreateSelectMenuOption::new("アンレート", "アンレート"),
-            CreateSelectMenuOption::new("コンペティティブ", "コンペティティブ"),
-            CreateSelectMenuOption::new("カスタム", "カスタム"),
+            CreateSelectMenuOption::new(Mode::Unrated.to_string(), Mode::Unrated.to_string()),
+            CreateSelectMenuOption::new(
+                Mode::Competitive.to_string(),
+                Mode::Competitive.to_string(),
+            ),
+            CreateSelectMenuOption::new(Mode::Custom.to_string(), Mode::Custom.to_string()),
         ],
     };
     let select_menu = CreateSelectMenu::new("募集形式を選択", select_menu_kind)
