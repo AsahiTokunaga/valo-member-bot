@@ -7,7 +7,7 @@ use serenity::model::id::MessageId;
 use serenity::model::webhook::Webhook;
 
 use crate::dotenv_handler;
-use crate::valkey::Valkey;
+use crate::valkey::commands;
 
 pub async fn edit(
     ctx: &SerenityContext,
@@ -17,7 +17,7 @@ pub async fn edit(
 ) -> AnyhowResult<()> {
     let redis_pass = dotenv_handler::get("REDIS_PASS")?;
     let channel_id = dotenv_handler::get("CHANNEL_ID")?;
-    let webhook_url = Valkey::get(&redis_pass, &channel_id).await?.unwrap();
+    let webhook_url = commands::get(&redis_pass, &channel_id).await?.unwrap();
     let webhook = Webhook::from_url(&ctx.http, &webhook_url).await?;
     let prev = webhook.get_message(&ctx.http, None, message_id).await?;
     let wh_message = EditWebhookMessage::new().embed(get_embed(prev, field_value, title));

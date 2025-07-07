@@ -6,27 +6,27 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-pub mod create;
-pub mod handler;
+pub mod send;
+pub mod buttons_handler;
 pub mod edit;
 
-type Webhooks = Lazy<RwLock<HashMap<InteractionId, Arc<RwLock<WebhookDatas>>>>>;
+type Webhooks = Lazy<RwLock<HashMap<InteractionId, Arc<RwLock<WebhookData>>>>>;
 
 pub static WEBHOOKS: Webhooks = Lazy::new(|| RwLock::new(HashMap::new()));
 #[derive(Debug)]
-pub struct WebhookDatas {
+pub struct WebhookData {
     pub ap_server: String,
     pub mode: String,
     pub rank: String,
     pub max_member: u8,
     pub joined: HashSet<UserId>,
 }
-impl WebhookDatas {
+impl WebhookData {
     pub async fn new(component: &ComponentInteraction) -> AnyhowResult<()> {
         let mut map = WEBHOOKS.write().await;
         map.insert(
             component.id,
-            Arc::new(RwLock::new(WebhookDatas {
+            Arc::new(RwLock::new(WebhookData {
                 ap_server: String::new(),
                 mode: String::new(),
                 rank: String::new(),
@@ -39,21 +39,21 @@ impl WebhookDatas {
 
     pub async fn with_mute<F>(id: &InteractionId, f: F) -> AnyhowResult<()>
     where 
-        F: FnOnce(&mut WebhookDatas),
+        F: FnOnce(&mut WebhookData),
     {
         let mut map = WEBHOOKS.write().await;
         let mut webhook = if let Some(w) = map.get_mut(id) {
             w.write().await
         } else {
             return Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: with_mute"
+                "[ FAILED ] InteractionIdに対するWebhookDataが見つかりません: with_mute"
             ));
         };
         f(&mut webhook);
         Ok(())
     }
 
-    pub async fn get(id: &InteractionId) -> Option<Arc<RwLock<WebhookDatas>>> {
+    pub async fn get(id: &InteractionId) -> Option<Arc<RwLock<WebhookData>>> {
         let map = WEBHOOKS.read().await;
         map.get(id).cloned()
     }
@@ -61,7 +61,7 @@ impl WebhookDatas {
         let mut map = WEBHOOKS.try_write()?;
         if map.remove(id).is_none() {
             return Err(anyhow::anyhow!(
-                "[ FAILED ] InteractionIdに対するWebhookDatasが見つかりません: del"
+                "[ FAILED ] InteractionIdに対するWebhookDataが見つかりません: del"
             ));
         }
         Ok(())

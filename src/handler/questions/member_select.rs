@@ -5,7 +5,7 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-use crate::handler::BASE_COLOR;
+use crate::handler::colors::BASE_COLOR;
 
 pub fn member(mode: String) -> EditInteractionResponse {
     let embed = CreateEmbed::new()

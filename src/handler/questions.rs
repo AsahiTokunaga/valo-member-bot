@@ -11,7 +11,7 @@ use component_store::ComponentStore;
 mod member_select;
 use member_select::member;
 mod recruit_message;
-use crate::handler::webhook::WebhookDatas;
+use crate::handler::webhook::WebhookData;
 use recruit_message::recruit_message;
 mod rank_select;
 use rank_select::rank;
@@ -22,7 +22,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let question = server();
             let case = &component.data.custom_id;
             let component_set_task = ComponentStore::set(&component);
-            let webhook_data_init_task = WebhookDatas::new(&component);
+            let webhook_data_init_task = WebhookData::new(&component);
             let create_response_task = component.create_response(&ctx.http, question);
             let (_, webhook_data_init, create_response) = tokio::join!(
                 component_set_task,
@@ -40,7 +40,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                     );
                 }
                 (Err(e), _) => {
-                    eprintln!("[ FAILED ] WebhookDatasの初期化に失敗しました: {}", e);
+                    eprintln!("[ FAILED ] WebhookDataの初期化に失敗しました: {}", e);
                 }
             }
         }
@@ -58,7 +58,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let component = ComponentStore::get(user_id).await;
             let edit_response_task = component.edit_response(&ctx.http, question);
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component.id, |w| w.ap_server = ap_server);
+                WebhookData::with_mute(&component.id, |w| w.ap_server = ap_server);
             let (webhook_data_set, edit_response) =
                 tokio::join!(webhook_data_set_task, edit_response_task);
             match (webhook_data_set, edit_response) {
@@ -72,7 +72,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                     );
                 }
                 (Err(e), _) => {
-                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                    eprintln!("[ FAILED ] WebhookDataの更新に失敗しました: {}", e);
                 }
             }
         }
@@ -88,7 +88,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             };
             let component = ComponentStore::get(user_id).await;
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component.id, |w| w.mode = mode.to_string());
+                WebhookData::with_mute(&component.id, |w| w.mode = mode.to_string());
             let edit_resuponse_task = if mode == "アンレート" || mode == "カスタム" {
                 let question = member(mode.to_string());
                 component.edit_response(&ctx.http, question)
@@ -109,7 +109,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                     );
                 }
                 (Err(e), _) => {
-                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                    eprintln!("[ FAILED ] WebhookDataの更新に失敗しました: {}", e);
                 }
             }
         }
@@ -138,7 +138,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let create_resuponse_task = component.create_response(&ctx.http, question);
             let component = ComponentStore::get(user_id).await;
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component.id, |w| w.max_member = max_member);
+                WebhookData::with_mute(&component.id, |w| w.max_member = max_member);
             let (webhook_data_set, create_response) =
                 tokio::join!(webhook_data_set_task, create_resuponse_task);
             match (webhook_data_set, create_response) {
@@ -152,7 +152,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                     );
                 }
                 (Err(e), _) => {
-                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                    eprintln!("[ FAILED ] WebhookDataの更新に失敗しました: {}", e);
                 }
             }
         }
@@ -170,7 +170,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
             let component = ComponentStore::get(user_id).await;
             let edit_response_task = component.edit_response(&ctx.http, question);
             let webhook_data_set_task =
-                WebhookDatas::with_mute(&component.id, |w| w.rank = rank.to_string());
+                WebhookData::with_mute(&component.id, |w| w.rank = rank.to_string());
             let (webhook_data_set, edit_response) =
                 tokio::join!(webhook_data_set_task, edit_response_task);
             match (webhook_data_set, edit_response) {
@@ -184,7 +184,7 @@ pub async fn questions(ctx: SerenityContext, component: ComponentInteraction) ->
                     );
                 }
                 (Err(e), _) => {
-                    eprintln!("[ FAILED ] WebhookDatasの更新に失敗しました: {}", e);
+                    eprintln!("[ FAILED ] WebhookDataの更新に失敗しました: {}", e);
                 }
             }
         }

@@ -1,0 +1,11 @@
+pub const PIN_MESSAGE_COLOR: u32 = 0xffffff;
+pub const BASE_COLOR: u32 = 0xff5152;
+pub const RADIANT_COLOR: u32 = 0xf9efa2;
+pub const IMMORTAL_COLOR: u32 = 0xbf334c;
+pub const ASCENDANT_COLOR: u32 = 0x1e8a51;
+pub const DIAMOND_COLOR: u32 = 0xc587f5;
+pub const PLATINUM_COLOR: u32 = 0x39a1b1;
+pub const GOLD_COLOR: u32 = 0xeabd44;
+pub const SILVER_COLOR: u32 = 0xd9e0dd;
+pub const BRONZE_COLOR: u32 = 0x865900;
+pub const IRON_COLOR: u32 = 0x4f4f4f;

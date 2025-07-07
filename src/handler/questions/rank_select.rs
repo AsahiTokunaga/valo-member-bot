@@ -3,7 +3,7 @@ use serenity::builder::{
     EditInteractionResponse,
 };
 
-use crate::handler::BASE_COLOR;
+use crate::handler::colors::BASE_COLOR;
 
 pub fn rank() -> EditInteractionResponse {
     let embed = CreateEmbed::new()

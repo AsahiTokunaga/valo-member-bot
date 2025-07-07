@@ -11,19 +11,8 @@ use pin::pin;
 mod questions;
 use questions::questions;
 mod webhook;
-use crate::handler::webhook::create::create as webhook_create;
-
-const PIN_MESSAGE_COLOR: u32 = 0xffffff;
-const BASE_COLOR: u32 = 0xff5152;
-const RADIANT_COLOR: u32 = 0xf9efa2;
-const IMMORTAL_COLOR: u32 = 0xbf334c;
-const ASCENDANT_COLOR: u32 = 0x1e8a51;
-const DIAMOND_COLOR: u32 = 0xc587f5;
-const PLATINUM_COLOR: u32 = 0x39a1b1;
-const GOLD_COLOR: u32 = 0xeabd44;
-const SILVER_COLOR: u32 = 0xd9e0dd;
-const BRONZE_COLOR: u32 = 0x865900;
-const IRON_COLOR: u32 = 0x4f4f4f;
+mod colors;
+use crate::handler::webhook::send::send;
 
 pub struct Handler;
 
@@ -51,11 +40,11 @@ impl EventHandler for Handler {
                 component.data.custom_id
             );
             match component.data.custom_id.as_str() {
-                "参加する" => webhook::handler::join(ctx, component).await
+                "参加する" => webhook::buttons_handler::join(ctx, component).await
                     .expect("[ FAILED ] 参加に失敗しました"),
-                "参加をやめる" => webhook::handler::leave(ctx, component).await
+                "参加をやめる" => webhook::buttons_handler::leave(ctx, component).await
                     .expect("[ FAILED ] 参加の取り消しに失敗しました"),
-                "削除" => webhook::handler::delete(ctx, component).await
+                "削除" => webhook::buttons_handler::delete(ctx, component).await
                     .expect("[ FAILED ] Webhookの削除に失敗しました"),
                 _ => questions(ctx, component)
                     .await
@@ -67,7 +56,7 @@ impl EventHandler for Handler {
                 .await
                 .expect("[ FAILED ] モーダルの応答に失敗しました");
             println!("[ OK ] モーダルを受信しました: {}", modal.data.custom_id);
-            webhook_create(&ctx, modal)
+            send(&ctx, modal)
                 .await
                 .expect("[ FAILED ] Webhookの作成に失敗しました");
         }

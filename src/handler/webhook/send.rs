@@ -14,27 +14,23 @@ use serenity::model::webhook::Webhook;
 use std::str::FromStr;
 
 use crate::dotenv_handler;
-use crate::handler::questions::component_store::ComponentStore;
-use crate::handler::webhook::{InteractionIdStore, WebhookDatas};
-use crate::handler::{
+use crate::handler::colors::{
     ASCENDANT_COLOR, BASE_COLOR, BRONZE_COLOR, DIAMOND_COLOR, GOLD_COLOR, IMMORTAL_COLOR,
     IRON_COLOR, PLATINUM_COLOR, RADIANT_COLOR, SILVER_COLOR,
 };
-use crate::valkey::Valkey;
+use crate::handler::questions::component_store::ComponentStore;
+use crate::handler::webhook::{InteractionIdStore, WebhookData};
+use crate::valkey::commands;
 
-pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
+pub async fn send(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowResult<()> {
     let user_id: UserId = modal.user.id;
     let channel_id = ChannelId::from_str(&dotenv_handler::get("CHANNEL_ID")?)?;
     let (user_name, user_avatar): (&str, &str) = (
-        modal
-            .user
-            .global_name
-            .as_ref()
-            .unwrap_or_else(|| &modal.user.name),
+        modal.user.global_name.as_ref().unwrap_or(&modal.user.name),
         &modal
             .user
             .avatar_url()
-            .unwrap_or_else(|| modal.user.default_avatar_url()),
+            .unwrap_or(modal.user.default_avatar_url()),
     );
     let content = match modal
         .data
@@ -49,7 +45,7 @@ pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowRes
     let action_row = CreateActionRow::Buttons(button);
     let webhook = get_webhook(ctx, channel_id);
     let component = ComponentStore::get(user_id).await;
-    let data = WebhookDatas::get(&component.id).await;
+    let data = WebhookData::get(&component.id).await;
     if let Some(webhook_data) = data {
         let webhook_data = webhook_data.read().await;
         let embed = get_embed(ctx, &webhook_data);
@@ -79,7 +75,10 @@ pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowRes
             match (s, i) {
                 (Ok(()), Ok(())) => {}
                 (Err(e), _) => {
-                    eprintln!("[ FAILED ] MessageIdに対するUserIdの保存に失敗しました: {}", e);
+                    eprintln!(
+                        "[ FAILED ] MessageIdに対するUserIdの保存に失敗しました: {}",
+                        e
+                    );
                 }
                 (_, Err(e)) => {
                     eprintln!("[ FAILED ] インタラクションIDの保存に失敗しました: {}", e);
@@ -90,7 +89,7 @@ pub async fn create(ctx: &SerenityContext, modal: ModalInteraction) -> AnyhowRes
     Ok(())
 }
 
-async fn get_embed(ctx: &SerenityContext, info: &WebhookDatas) -> CreateEmbed {
+async fn get_embed(ctx: &SerenityContext, info: &WebhookData) -> CreateEmbed {
     let mut users = info
         .joined
         .iter()
@@ -152,7 +151,7 @@ fn get_button() -> Vec<CreateButton> {
 
 async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResult<Webhook> {
     let redis_pass = dotenv_handler::get("REDIS_PASS")?;
-    if let Ok(Some(webhook_url)) = Valkey::get(&redis_pass, &channel_id.to_string()).await {
+    if let Ok(Some(webhook_url)) = commands::get(&redis_pass, &channel_id.to_string()).await {
         if let Ok(webhook) = Webhook::from_url(&ctx.http, &webhook_url).await {
             return Ok(webhook);
         }
@@ -161,16 +160,13 @@ async fn get_webhook(ctx: &SerenityContext, channel_id: ChannelId) -> AnyhowResu
         .execute(&ctx.http, channel_id)
         .await?;
     if let Ok(webhook_url) = builder.url() {
-        Valkey::set(&redis_pass, &channel_id.to_string(), &webhook_url).await?;
+        commands::set(&redis_pass, &channel_id.to_string(), &webhook_url).await?;
     }
     Ok(builder)
 }
 
 fn get_thumbnail(rank: &str) -> Option<String> {
-    let base_img_url = dotenv_handler::get("BASE_IMG_URL").unwrap_or_else(|e| {
-        println!("{}", e);
-        String::new()
-    });
+    let base_img_url = dotenv_handler::get("BASE_IMG_URL").unwrap_or(String::new());
     match rank {
         "レディアント" => Some(format!("{}radiant.png", base_img_url)),
         "イモータル" => Some(format!("{}immortal.png", base_img_url)),
@@ -204,7 +200,7 @@ fn get_colour(rank: &str) -> Option<u32> {
 
 async fn store_user(message_id: MessageId, user_id: UserId) -> AnyhowResult<()> {
     let redis_pass = dotenv_handler::get("REDIS_PASS")?;
-    Valkey::ttl_set(
+    commands::ttl_set(
         redis_pass.as_str(),
         message_id.to_string().as_str(),
         user_id.to_string().as_str(),

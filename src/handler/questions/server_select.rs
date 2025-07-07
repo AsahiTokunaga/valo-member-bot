@@ -4,7 +4,7 @@ use serenity::builder::{
 };
 use serenity::model::channel::ReactionType;
 
-use crate::handler::BASE_COLOR;
+use crate::handler::colors::BASE_COLOR;
 
 pub fn server() -> CreateInteractionResponse {
     let embed = CreateEmbed::new()
