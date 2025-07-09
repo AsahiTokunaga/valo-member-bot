@@ -1,12 +1,16 @@
 use dotenv::dotenv;
-use anyhow::Result as AnyhowResult;
+use tracing::instrument;
 
-pub fn load() -> AnyhowResult<()> {
-    dotenv().map_err(|e| anyhow::anyhow!("[ FAILED ] 環境変数の読み込みに失敗しました: {}", e))?;
-    Ok(())
+use crate::error::BotError;
+
+#[instrument(name = "dotenv_handler/load", skip_all)]
+pub fn load() -> Result<(), BotError> {
+  dotenv()?;
+  Ok(())
 }
 
-pub fn get(key: &str) -> AnyhowResult<String> {
-    std::env::var(key)
-        .map_err(|_| anyhow::anyhow!("[ FAILED ] 環境変数 '{}' が設定されていません", key))
+#[instrument(name = "dotenv_handler/get", skip_all, fields(key = %key))]
+pub fn get(key: &str) -> Result<String, BotError> {
+  let value = dotenv::var(key)?;
+  Ok(value)
 }
