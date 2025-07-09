@@ -10,7 +10,7 @@ use crate::dotenv_handler;
 use crate::error::BotError;
 use crate::valkey::commands;
 
-#[instrument(name = "handler/webhook_edit/edit", skip_all, level = Level::INFO, err(level = Level::ERROR) fields(message_id = %message_id))]
+#[instrument(name = "handler/webhook_edit/edit", skip_all, level = Level::INFO, err(level = Level::WARN) fields(message_id = %message_id))]
 pub async fn edit(
   ctx: &SerenityContext,
   message_id: MessageId,

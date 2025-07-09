@@ -3,6 +3,7 @@ use std::str::FromStr;
 use crate::error::BotError;
 use crate::handler::state::methods::{component_store_map, webhook_map};
 use crate::handler::state::{APServer, Mode, Rank};
+use serenity::all::{CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::client::Context as SerenityContext;
 use serenity::model::application::ComponentInteraction;
 use serenity::model::application::ComponentInteractionDataKind;
@@ -18,11 +19,26 @@ mod rank_select;
 use rank_select::rank;
 use tracing::{Level, instrument};
 
-#[instrument(name = "handler/questions/questions", level = Level::INFO, err(level = Level::ERROR), skip_all, fields(custom_id = %component.data.custom_id, user_id = %component.user.id))]
+#[instrument(name = "handler/questions/questions", level = Level::INFO, err(level = Level::WARN), skip_all, fields(custom_id = %component.data.custom_id, user_id = %component.user.id))]
 pub async fn questions(
   ctx: SerenityContext,
   component: ComponentInteraction,
 ) -> Result<(), BotError> {
+  if component.data.custom_id != "募集を作成"
+    && component_store_map::get(&ctx, &component.user.id)
+      .await
+      .is_err()
+  {
+    tracing::warn!("期限切れの質問です");
+    component
+      .create_response(&ctx.http, CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+          .content("期限切れの質問です。再度募集を作成してください。")
+          .ephemeral(true)
+      ))
+      .await?;
+    return Ok(());
+  }
   match component.data.custom_id.as_str() {
     "募集を作成" => {
       let question = server();
@@ -85,30 +101,20 @@ pub async fn questions(
     "募集人数を選択" => {
       let user_id = component.user.id;
       let question = recruit_message();
-      let party = if let ComponentInteractionDataKind::StringSelect { values } =
-        &component.data.kind
-      {
-        &values.get(0).unwrap()
-      } else {
-        "フルパ"
-      };
-      let max_member: u8 = match party {
-        "デュオ" | "2人" => 2,
-        "トリオ" | "3人" => 3,
-        "クアッド" | "4人" => 4,
-        "フルパ" | "5人" => 5,
-        "6人" => 6,
-        "7人" => 7,
-        "8人" => 8,
-        "9人" => 9,
-        "10人" => 10,
-        _ => 5,
-      };
+      let max_member =
+        if let ComponentInteractionDataKind::StringSelect { values } =
+          &component.data.kind
+        {
+          crate::handler::state::MaxMember::from_str(&values.get(0).unwrap())
+            .ok()
+        } else {
+          None
+        };
       component.create_response(&ctx.http, question).await?;
       let component = component_store_map::get(&ctx, &user_id).await?;
       let component = component.read().await;
       webhook_map::with_mute(&ctx, &component.id, |w| {
-        w.max_member = max_member
+        w.max_member = max_member.unwrap() // enumでの管理なのでunwrapを使用
       })
       .await?;
       drop(component);

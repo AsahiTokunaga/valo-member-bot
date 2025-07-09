@@ -5,14 +5,14 @@ pub mod commands {
 
   use crate::error::BotError;
 
-  #[instrument(name = "valkey/commands/new", err, level = Level::ERROR, skip_all)]
+  #[instrument(name = "valkey/commands/new", err, level = Level::WARN, skip_all)]
   async fn new(redis_pass: &str) -> Result<ConnectionManager, BotError> {
     let client = Client::open(format!("redis://:{}@127.0.0.1/", redis_pass))?;
     let manager = ConnectionManager::new(client).await?;
     Ok(manager)
   }
 
-  #[instrument(name = "valkey/commands/ping", level = Level::INFO, err(level = Level::ERROR), skip_all)]
+  #[instrument(name = "valkey/commands/ping", level = Level::INFO, err(level = Level::WARN), skip_all)]
   pub async fn ping(redis_pass: &str) -> Result<(), BotError> {
     let mut connection = new(redis_pass).await?;
     let pong: String = connection.ping().await?;
@@ -20,7 +20,7 @@ pub mod commands {
     Ok(())
   }
 
-  #[instrument(name = "valkey/commands/set", level = Level::INFO, err(level = Level::ERROR), skip_all, fields(key = %key, value = %value))]
+  #[instrument(name = "valkey/commands/set", level = Level::INFO, err(level = Level::WARN), skip_all, fields(key = %key, value = %value))]
   pub async fn set(
     redis_pass: &str,
     key: &str,
@@ -32,7 +32,7 @@ pub mod commands {
     Ok(())
   }
 
-  #[instrument(name = "valkey/commands/get", level = Level::INFO, err(level = Level::ERROR), skip_all, fields(key = %key))]
+  #[instrument(name = "valkey/commands/get", level = Level::INFO, err(level = Level::WARN), skip_all, fields(key = %key))]
   pub async fn get(
     redis_pass: &str,
     key: &str,
@@ -42,7 +42,7 @@ pub mod commands {
     Ok(value)
   }
 
-  #[instrument(name = "valkey/commands/ttl_set", level = Level::INFO, err(level = Level::ERROR), skip_all, fields(key = %key, value = %value, ttl))]
+  #[instrument(name = "valkey/commands/ttl_set", level = Level::INFO, err(level = Level::WARN), skip_all, fields(key = %key, value = %value, ttl))]
   pub async fn ttl_set(
     redis_pass: &str,
     key: &str,
@@ -51,6 +51,15 @@ pub mod commands {
   ) -> Result<(), BotError> {
     let mut connection = new(redis_pass).await?;
     connection.set_ex::<&str, &str, ()>(key, value, ttl).await?;
+    Ok(())
+  }
+
+  pub async fn del(
+    redis_pass: &str,
+    key: &str,
+  ) -> Result<(), BotError> {
+    let mut connection = new(redis_pass).await?;
+    connection.del::<&str, ()>(key).await?;
     Ok(())
   }
 }

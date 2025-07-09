@@ -14,7 +14,7 @@ use crate::error::BotError;
 use crate::handler::colors::PIN_MESSAGE_COLOR;
 use crate::valkey::commands;
 
-#[instrument(name = "handler/pin/pin", skip_all, level = Level::INFO, err(level = Level::ERROR))]
+#[instrument(name = "handler/pin/pin", skip_all, level = Level::INFO, err(level = Level::WARN))]
 pub async fn pin(ctx: &Context, channel_id: ChannelId) -> Result<(), BotError> {
   tracing::info!("処理開始");
   let delete_latest_task = delete_latest(ctx);
@@ -39,7 +39,7 @@ pub async fn pin(ctx: &Context, channel_id: ChannelId) -> Result<(), BotError> {
   Ok(())
 }
 
-#[instrument(name = "handler/pin/delete_latest", skip_all, level = Level::INFO, err(level = Level::ERROR))]
+#[instrument(name = "handler/pin/delete_latest", skip_all, level = Level::INFO, err(level = Level::WARN))]
 async fn delete_latest(ctx: &Context) -> Result<(), BotError> {
   tracing::info!("処理開始");
   let redis_pass = dotenv_handler::get("REDIS_PASS")?;

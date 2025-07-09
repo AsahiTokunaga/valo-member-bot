@@ -12,16 +12,16 @@ pub fn q_match() -> EditInteractionResponse {
   let select_menu_kind = CreateSelectMenuKind::String {
     options: vec![
       CreateSelectMenuOption::new(
-        Mode::Unrated.to_string(),
-        Mode::Unrated.to_string(),
+        Mode::Unrated.as_str(),
+        Mode::Unrated.as_str(),
       ),
       CreateSelectMenuOption::new(
-        Mode::Competitive.to_string(),
-        Mode::Competitive.to_string(),
+        Mode::Competitive.as_str(),
+        Mode::Competitive.as_str(),
       ),
       CreateSelectMenuOption::new(
-        Mode::Custom.to_string(),
-        Mode::Custom.to_string(),
+        Mode::Custom.as_str(),
+        Mode::Custom.as_str(),
       ),
     ],
   };

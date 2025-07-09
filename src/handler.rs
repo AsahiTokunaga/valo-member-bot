@@ -22,7 +22,6 @@ mod webhook_buttons;
 mod webhook_edit;
 mod webhook_send;
 use crate::dotenv_handler;
-use crate::log_error;
 use state::{ComponentStoreMap, InteractionIdMap, WebhookMap};
 
 pub struct Handler;
@@ -45,7 +44,7 @@ impl EventHandler for Handler {
     let bot_id = match dotenv_handler::get("BOT_ID") {
       Ok(id) => id,
       Err(e) => {
-        tracing::error!(error = %e, "環境変数 BOT_ID の取得に失敗しました");
+        tracing::warn!(error = %e, "環境変数 BOT_ID の取得に失敗しました");
         return;
       }
     };
@@ -56,7 +55,7 @@ impl EventHandler for Handler {
           tracing::info!("ピンメッセージの更新に成功しました");
         }
         Err(e) => {
-          tracing::error!(error = %e, "ピンメッセージの更新に失敗しました")
+          tracing::warn!(error = %e, "ピンメッセージの更新に失敗しました");
         }
       }
     }
@@ -77,7 +76,7 @@ impl EventHandler for Handler {
             tracing::info!("募集参加処理が終了しました");
           }
           Err(e) => {
-            tracing::error!(error = %e, "募集参加処理に失敗しました")
+            tracing::warn!(error = %e, "募集参加処理に失敗しました")
           }
         },
         "参加をやめる" => {
@@ -86,7 +85,7 @@ impl EventHandler for Handler {
               tracing::info!("募集参加取り消し処理が終了しました");
             }
             Err(e) => {
-              tracing::error!(error = %e, "募集参加取り消し処理に失敗しました")
+              tracing::warn!(error = %e, "募集参加取り消し処理に失敗しました")
             }
           }
         }
@@ -95,7 +94,7 @@ impl EventHandler for Handler {
             tracing::info!("募集削除処理が終了しました");
           }
           Err(e) => {
-            tracing::error!(error = %e, "募集削除処理に失敗しました");
+            tracing::warn!(error = %e, "募集削除処理に失敗しました");
           }
         },
         _ => match questions(ctx, component).await {
@@ -103,7 +102,7 @@ impl EventHandler for Handler {
             tracing::info!("質問送信処理が終了しました");
           }
           Err(e) => {
-            tracing::error!(error = %e, "質問送信処理に失敗しました")
+            tracing::warn!(error = %e, "質問送信処理に失敗しました")
           }
         },
       }
@@ -115,7 +114,7 @@ impl EventHandler for Handler {
           tracing::info!("モーダルの応答送信に成功しました");
         }
         Err(e) => {
-          tracing::error!(error = %e, "モーダルの応答送信に失敗しました");
+          tracing::warn!(error = %e, "モーダルの応答送信に失敗しました");
           return;
         }
       }
@@ -124,7 +123,7 @@ impl EventHandler for Handler {
           tracing::info!("募集送信処理が終了しました");
         }
         Err(e) => {
-          tracing::error!(error = %e, "募集送信処理に失敗しました");
+          tracing::warn!(error = %e, "募集送信処理に失敗しました");
         }
       }
     }

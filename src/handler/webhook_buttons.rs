@@ -13,12 +13,12 @@ use serenity::model::id::{InteractionId, MessageId, UserId};
 use serenity::model::webhook::Webhook;
 use tracing::{Level, instrument};
 
-use crate::dotenv_handler;
 use crate::error::BotError;
 use crate::handler::state::WebhookData;
 use crate::handler::state::methods::{interaction_id_map, webhook_map};
 use crate::handler::webhook_edit::edit;
 use crate::valkey::commands;
+use crate::dotenv_handler;
 
 #[instrument(name = "handler/webhook_buttons/join", skip_all, level = Level::INFO, fields(custom_id = %component.data.custom_id, user_id = %component.user.id, message_id = %component.message.id))]
 pub async fn join(
@@ -42,14 +42,14 @@ pub async fn join(
     response(&ctx.http, &component, "すでに募集に参加しています", true).await?;
   } else {
     drop(webhook_data);
-    update_webhook_data(&ctx, &interaction_id, enter_join_user, 'i').await?;
+    update_webhook_data(&ctx, &interaction_id, enter_join_user, 'p').await?;
     let webhook_data = webhook_map::get(&ctx, &interaction_id).await.unwrap();
     let webhook_data = webhook_data.read().await;
     let names = get_field_value(&webhook_data).await;
     let title: (usize, u8) =
-      (webhook_data.joined.len(), webhook_data.max_member);
+      (webhook_data.joined.len(), webhook_data.max_member.into());
     edit(&ctx, message_id, &names, title).await?;
-    if is_fill(webhook_data.joined.len(), webhook_data.max_member) {
+    if is_fill(webhook_data.joined.len(), webhook_data.max_member.into()) {
       recruitment_filled(&ctx.http, message_id).await?;
       let names: String = webhook_data
         .joined
@@ -96,7 +96,10 @@ pub async fn leave(
     let webhook_data = webhook_map::get(&ctx, &interaction_id).await?;
     let webhook_data = webhook_data.read().await;
     if linked_message_user_id == enter_leave_user {
-      tracing::info!("募集の作成者が参加を取り消そうとしました: {}", enter_leave_user);
+      tracing::info!(
+        "募集の作成者が参加を取り消そうとしました: {}",
+        enter_leave_user
+      );
       response(&ctx.http, &component, "募集の作成者は参加を取り消せません\n募集取り消しの場合は削除ボタンを押してください", true).await?;
     } else {
       if webhook_data.joined.contains(&enter_leave_user) {
@@ -108,14 +111,17 @@ pub async fn leave(
         let webhook_data = webhook_data.read().await;
         let names = get_field_value(&webhook_data).await;
         let title: (usize, u8) =
-          (webhook_data.joined.len(), webhook_data.max_member);
+          (webhook_data.joined.len(), webhook_data.max_member.into());
         tokio::try_join!(
           edit(&ctx, message_id, &names, title),
           response(&ctx.http, &component, "参加を取り消しました", true)
         )?;
         drop(webhook_data);
       } else {
-        tracing::info!("参加していないユーザーが参加を取り消そうとしました: {}", enter_leave_user);
+        tracing::info!(
+          "参加していないユーザーが参加を取り消そうとしました: {}",
+          enter_leave_user
+        );
         response(&ctx.http, &component, "募集に参加していません", true).await?;
       }
     }
@@ -140,7 +146,10 @@ pub async fn delete(
   if let Some(user) = linked_message_user {
     let linked_message_user_id = UserId::from_str(&user)?;
     if linked_message_user_id != enter_delete_user {
-      tracing::info!("募集の作成者以外が削除しようとしました: {}", enter_delete_user);
+      tracing::info!(
+        "募集の作成者以外が削除しようとしました: {}",
+        enter_delete_user
+      );
       response(
         &ctx.http,
         &component,
@@ -155,10 +164,26 @@ pub async fn delete(
         .await?;
       let interaction_id =
         interaction_id_map::get(&ctx, &component.message.id).await?;
-      tokio::try_join!(
+      let (webhook_map_del, interaction_id_map_del, commands_del) = tokio::join!(
         webhook_map::del(&ctx, &interaction_id),
-        interaction_id_map::del(&ctx, &component.message.id)
-      )?;
+        interaction_id_map::del(&ctx, &component.message.id),
+        commands::del(&redis_pass, &message_id)
+      );
+      match (webhook_map_del, interaction_id_map_del, commands_del) {
+        (Ok(_), Ok(_), Ok(_)) => {}
+        (_, _, Err(e)) => {
+          tracing::error!(error = %e, "message_id : user_idの削除に失敗");
+          return Err(e);
+        }
+        (_, Err(e), _) => {
+          tracing::error!(error = %e, "message_id : interaction_idの削除に失敗");
+          return Err(BotError::AppStateError(e));
+        }
+        (Err(e), _, _) => {
+          tracing::error!(error = %e, "interaction_id : webhook_dataの削除に失敗");
+          return Err(BotError::AppStateError(e));
+        }
+      }
     }
   } else {
     timeout(&ctx.http, &component).await?;
@@ -167,7 +192,7 @@ pub async fn delete(
   Ok(())
 }
 
-#[instrument(name = "handler/webhook_buttons/timeout", skip_all, level = Level::INFO, err(level = Level::ERROR), fields(custom_id = %comp.data.custom_id, user_id = %comp.user.id, message_id = %comp.message.id))]
+#[instrument(name = "handler/webhook_buttons/timeout", skip_all, level = Level::INFO, err(level = Level::WARN), fields(custom_id = %comp.data.custom_id, user_id = %comp.user.id, message_id = %comp.message.id))]
 async fn timeout<T: AsRef<Http> + CacheHttp + Copy>(
   http: T,
   comp: &ComponentInteraction,
@@ -187,18 +212,18 @@ async fn timeout<T: AsRef<Http> + CacheHttp + Copy>(
   match (create_response, delete_message) {
     (Ok(_), Ok(_)) => tracing::info!("期限切れの募集を削除しました"),
     (_, Err(e)) => {
-      tracing::error!("期限切れ募集の削除に失敗");
+      tracing::warn!(error = %e, "期限切れ募集の削除に失敗");
       return Err(BotError::SerenityError(e));
     }
     (Err(e), _) => {
-      tracing::error!("期限切れ募集の応答送信に失敗");
+      tracing::warn!(error = %e, "期限切れ募集の応答送信に失敗");
       return Err(BotError::SerenityError(e));
     }
   }
   Ok(())
 }
 
-#[instrument(name = "handler/webhook_buttons/response", skip_all, level = Level::INFO, err(level = Level::ERROR), fields(custom_id = %comp.data.custom_id, user_id = %comp.user.id, message_id = %comp.message.id))]
+#[instrument(name = "handler/webhook_buttons/response", skip_all, level = Level::INFO, err(level = Level::WARN), fields(custom_id = %comp.data.custom_id, user_id = %comp.user.id, message_id = %comp.message.id))]
 async fn response<T: CacheHttp>(
   http: T,
   comp: &ComponentInteraction,
@@ -216,17 +241,17 @@ async fn response<T: CacheHttp>(
   Ok(())
 }
 
-#[instrument(name = "handler/webhook_buttons/update_webhook_data", skip_all, level = Level::INFO, err(level = Level::ERROR), fields(interaction_id = %interaction_id, user_id = %user_id, update_type = %i_r))]
+#[instrument(name = "handler/webhook_buttons/update_webhook_data", skip_all, level = Level::INFO, err(level = Level::WARN), fields(interaction_id = %interaction_id, user_id = %user_id, update_type = %p_r))]
 async fn update_webhook_data(
   ctx: &SerenityContext,
   interaction_id: &InteractionId,
   user_id: UserId,
-  i_r: char,
+  p_r: char,
 ) -> Result<(), BotError> {
-  match i_r {
-    'i' => {
+  match p_r {
+    'p' => {
       webhook_map::with_mute(ctx, interaction_id, |w| {
-        w.joined.insert(user_id);
+        w.joined.push(user_id);
       })
       .await?;
       tracing::info!("参加者を追加しました");
@@ -234,14 +259,16 @@ async fn update_webhook_data(
     }
     'r' => {
       webhook_map::with_mute(ctx, interaction_id, |w| {
-        w.joined.remove(&user_id);
+        if let Some(idx) = w.joined.iter().position(|u| u == &user_id) {
+          w.joined.remove(idx);
+        }
       })
       .await?;
       tracing::info!("参加者を削除しました");
       Ok(())
     }
     _ => {
-      tracing::error!("不正な操作");
+      tracing::warn!("不正な操作");
       return Err(BotError::InvalidInput);
     }
   }
@@ -260,7 +287,7 @@ fn is_fill(joined_users: usize, max_member: u8) -> bool {
   joined_users as u8 == max_member
 }
 
-#[instrument(name = "handler/webhook_buttons/recruitment_filled", skip_all, level = Level::INFO, err(level = Level::ERROR), fields(message_id = %message_id))]
+#[instrument(name = "handler/webhook_buttons/recruitment_filled", skip_all, level = Level::INFO, err(level = Level::WARN), fields(message_id = %message_id))]
 async fn recruitment_filled<T: AsRef<Http> + CacheHttp + Copy>(
   http: T,
   message_id: MessageId,

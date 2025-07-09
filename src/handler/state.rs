@@ -1,6 +1,5 @@
 use std::{
-  collections::{HashMap, HashSet},
-  fmt::Display,
+  collections::HashMap,
   str::FromStr,
   sync::Arc,
 };
@@ -9,6 +8,7 @@ use serenity::{
   all::{ComponentInteraction, InteractionId, MessageId, UserId},
   prelude::TypeMapKey,
 };
+use smallvec::SmallVec;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone, Copy)]
@@ -30,15 +30,13 @@ impl APServer {
     ]
     .into_iter()
   }
-}
-impl Display for APServer {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  pub fn as_str(&self) -> &'static str {
     match self {
-      APServer::Tokyo => write!(f, "Tokyo/東京🇯🇵"),
-      APServer::HongKong => write!(f, "Hong Kong/香港 🇭🇰"),
-      APServer::Singapore => write!(f, "Singapore/シンガポール 🇸🇬"),
-      APServer::Sydney => write!(f, "Sydney/シドニー 🇦🇺"),
-      APServer::Mumbai => write!(f, "Mumbai/ムンバイ 🇮🇳"),
+      APServer::Tokyo => "Tokyo/東京 🇯🇵",
+      APServer::HongKong => "Hong Kong/香港 🇭🇰",
+      APServer::Singapore => "Singapore/シンガポール 🇸🇬",
+      APServer::Sydney => "Sydney/シドニー 🇦🇺",
+      APServer::Mumbai => "Mumbai/ムンバイ 🇮🇳",
     }
   }
 }
@@ -47,7 +45,7 @@ impl FromStr for APServer {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     Self::variants()
-      .find(|&server| server.to_string() == s)
+      .find(|&server| server.as_str() == s)
       .ok_or("Invalid APServer string")
   }
 }
@@ -62,13 +60,11 @@ impl Mode {
   pub fn variants() -> impl Iterator<Item = Mode> {
     [Mode::Unrated, Mode::Competitive, Mode::Custom].into_iter()
   }
-}
-impl Display for Mode {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  pub fn as_str(&self) -> &'static str {
     match self {
-      Mode::Unrated => write!(f, "アンレート"),
-      Mode::Competitive => write!(f, "コンペティティブ"),
-      Mode::Custom => write!(f, "カスタム"),
+      Mode::Unrated => "アンレート",
+      Mode::Competitive => "コンペティティブ",
+      Mode::Custom => "カスタム",
     }
   }
 }
@@ -77,7 +73,7 @@ impl FromStr for Mode {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     Self::variants()
-      .find(|&mode| mode.to_string() == s)
+      .find(|&mode| mode.as_str() == s)
       .ok_or("Invalid Mode string")
   }
 }
@@ -111,20 +107,18 @@ impl Rank {
     ]
     .into_iter()
   }
-}
-impl Display for Rank {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  pub fn as_str(&self) -> &'static str {
     match self {
-      Rank::Radiant => write!(f, "レディアント"),
-      Rank::Immortal => write!(f, "イモータル"),
-      Rank::Ascendant => write!(f, "アセンダント"),
-      Rank::Diamond => write!(f, "ダイヤモンド"),
-      Rank::Platinum => write!(f, "プラチナ"),
-      Rank::Gold => write!(f, "ゴールド"),
-      Rank::Silver => write!(f, "シルバー"),
-      Rank::Bronze => write!(f, "ブロンズ"),
-      Rank::Iron => write!(f, "アイアン"),
-      Rank::Unranked => write!(f, "どこでも"),
+      Rank::Radiant => "レディアント",
+      Rank::Immortal => "イモータル",
+      Rank::Ascendant => "アセンダント",
+      Rank::Diamond => "ダイヤモンド",
+      Rank::Platinum => "プラチナ",
+      Rank::Gold => "ゴールド",
+      Rank::Silver => "シルバー",
+      Rank::Bronze => "ブロンズ",
+      Rank::Iron => "アイアン",
+      Rank::Unranked => "どこでも",
     }
   }
 }
@@ -133,7 +127,7 @@ impl FromStr for Rank {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     Self::variants()
-      .find(|&rank| rank.to_string() == s)
+      .find(|&rank| rank.as_str() == s)
       .ok_or("Invalid Rank string")
   }
 }
@@ -165,19 +159,17 @@ impl MaxMember {
     ]
     .into_iter()
   }
-}
-impl Display for MaxMember {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  pub fn as_str(&self) -> &'static str {
     match self {
-      MaxMember::Duo => write!(f, "デュオ"),
-      MaxMember::Trio => write!(f, "トリオ"),
-      MaxMember::Quad => write!(f, "クアッド"),
-      MaxMember::Five => write!(f, "フルパ"),
-      MaxMember::Six => write!(f, "6人"),
-      MaxMember::Seven => write!(f, "7人"),
-      MaxMember::Eight => write!(f, "8人"),
-      MaxMember::Nine => write!(f, "9人"),
-      MaxMember::Ten => write!(f, "10人"),
+      MaxMember::Duo => "デュオ",
+      MaxMember::Trio => "トリオ",
+      MaxMember::Quad => "クアッド",
+      MaxMember::Five => "フルパ",
+      MaxMember::Six => "6人",
+      MaxMember::Seven => "7人",
+      MaxMember::Eight => "8人",
+      MaxMember::Nine => "9人",
+      MaxMember::Ten => "10人",
     }
   }
 }
@@ -186,7 +178,7 @@ impl FromStr for MaxMember {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     Self::variants()
-      .find(|&max_member| max_member.to_string() == s)
+      .find(|&max_member| max_member.as_str() == s)
       .ok_or("Invalid MaxMember string")
   }
 }
@@ -211,8 +203,8 @@ pub struct WebhookData {
   pub ap_server: APServer,
   pub mode: Mode,
   pub rank: Option<Rank>,
-  pub max_member: u8,
-  pub joined: HashSet<UserId>,
+  pub max_member: MaxMember,
+  pub joined: SmallVec<[UserId; 10]>
 }
 pub struct WebhookMap;
 impl TypeMapKey for WebhookMap {
@@ -237,6 +229,8 @@ pub mod methods {
   use tracing::instrument;
 
   pub mod webhook_map {
+    use smallvec::smallvec;
+
     use super::*;
     pub async fn new(
       ctx: &Context,
@@ -255,8 +249,8 @@ pub mod methods {
           ap_server: APServer::Tokyo,
           mode: Mode::Unrated,
           rank: None,
-          max_member: 5,
-          joined: HashSet::from([user_id]),
+          max_member: MaxMember::Five,
+          joined: smallvec![user_id],
         })),
       );
     }

@@ -37,10 +37,3 @@ pub enum AppStateError {
   )]
   ComponentInteractionNotFound,
 }
-
-#[macro_export]
-macro_rules! log_error {
-    ($error:expr, $msg:expr) => {
-        tracing::error!(error = %$error, "{} ({}: Ln {})", $msg, file!(), line!());
-    };
-}

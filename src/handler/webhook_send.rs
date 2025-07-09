@@ -25,7 +25,7 @@ use crate::handler::state::methods::{
 use crate::handler::state::{Mode, Rank, WebhookData};
 use crate::valkey::commands;
 
-#[instrument(name = "handler/webhook_send/send", skip_all, level = Level::INFO, err(level = Level::ERROR), fields(user_id = %modal.user.id))]
+#[instrument(name = "handler/webhook_send/send", skip_all, level = Level::INFO, err(level = Level::WARN), fields(user_id = %modal.user.id))]
 pub async fn send(
   ctx: &SerenityContext,
   modal: ModalInteraction,
@@ -40,15 +40,15 @@ pub async fn send(
       .avatar_url()
       .unwrap_or(modal.user.default_avatar_url()),
   );
-  let content = match modal
+  let content = modal
     .data
     .components
     .get(0)
     .and_then(|row| row.components.get(0))
-  {
-    Some(ActionRowComponent::InputText(input)) => Some(input.value.clone()),
-    _ => None,
-  };
+    .and_then(|c| match c {
+      ActionRowComponent::InputText(input) => Some(input.value.clone()),
+      _ => None,
+    });
   let button = get_button();
   let action_row = CreateActionRow::Buttons(button);
   let webhook = get_webhook(ctx, channel_id);
@@ -112,16 +112,16 @@ async fn get_embed(
     .title(format!(
       "({}/{})",
       webhook_data.joined.len(),
-      webhook_data.max_member
+      Into::<u8>::into(webhook_data.max_member)
     ))
     .description(format!(
       "サーバー：{}\nモード　：{}{}",
-      webhook_data.ap_server,
-      webhook_data.mode,
+      webhook_data.ap_server.as_str(),
+      webhook_data.mode.as_str(),
       if webhook_data.rank.is_none() {
         String::new()
       } else {
-        format!("\nランク　：{}", webhook_data.rank.unwrap().to_string())
+        format!("\nランク　：{}", webhook_data.rank.unwrap().as_str())
       }
     ))
     .field("参加者", names, false);
@@ -214,6 +214,7 @@ fn get_color(webhook_data: &WebhookData) -> Option<u32> {
   }
 }
 
+#[instrument(name = "handler/webhook_send/store_user", skip_all, level = Level::INFO, err(level = Level::WARN), fields(key = %message_id, value = %user_id))]
 async fn store_user(
   message_id: MessageId,
   user_id: UserId,
@@ -225,5 +226,7 @@ async fn store_user(
     user_id.to_string().as_str(),
     259200,
   )
-  .await
+  .await?;
+  tracing::info!("Redisに値をセットしました");
+  Ok(())
 }

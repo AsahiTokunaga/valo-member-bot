@@ -14,8 +14,8 @@ use crate::error::BotError;
 mod dotenv_handler;
 mod error;
 
-#[tokio::main]
-#[instrument(name = "main", level = Level::ERROR)]
+#[tokio::main(flavor = "current_thread")]
+#[instrument(name = "main", err(level = Level::ERROR))]
 async fn main() -> Result<(), BotError> {
   let subscriber = FmtSubscriber::builder()
     .with_max_level(Level::INFO)
