@@ -5,7 +5,7 @@ use crate::error::BotError;
 
 #[instrument(name = "dotenv_handler/load", skip_all)]
 pub fn load() -> Result<(), BotError> {
-  dotenv()?;
+  dotenv().ok();
   Ok(())
 }
 
