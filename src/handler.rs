@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use serenity::all::ChannelId;
 use serenity::async_trait;
 use serenity::client::Context as SerenityContext;
 use serenity::client::EventHandler;
@@ -14,8 +16,8 @@ mod questions;
 use questions::questions;
 use tokio::sync::RwLock;
 use tracing::Level;
-use tracing::instrument;
 use tracing::Span;
+use tracing::instrument;
 mod colors;
 mod state;
 mod webhook_buttons;
@@ -41,6 +43,23 @@ impl EventHandler for Handler {
 
   #[instrument(name = "handler/message", skip_all, level = Level::INFO)]
   async fn message(&self, ctx: SerenityContext, msg: Message) {
+    let channel_id = match dotenv_handler::get("CHANNEL_ID") {
+      Ok(id) => match ChannelId::from_str(&id) {
+        Ok(id) => id,
+        Err(e) => {
+          tracing::warn!(error = %e, "CHANNEL_ID のパースに失敗しました");
+          return;
+        }
+      },
+      Err(e) => {
+        tracing::warn!(error = %e, "環境変数 CHANNEL_ID の取得に失敗しました");
+        return;
+      }
+    };
+    if msg.channel_id != channel_id {
+      return;
+    }
+    
     let bot_id = match dotenv_handler::get("BOT_ID") {
       Ok(id) => id,
       Err(e) => {
@@ -49,7 +68,20 @@ impl EventHandler for Handler {
       }
     };
     if msg.author.id.to_string() != bot_id {
-      let result = pin(&ctx, msg.channel_id).await;
+      let channel_id = match dotenv_handler::get("CHANNEL_ID") {
+        Ok(id) => match ChannelId::from_str(&id) {
+          Ok(id) => id,
+          Err(e) => {
+            tracing::warn!(error = %e, "CHANNEL_ID のパースに失敗しました");
+            return;
+          }
+        },
+        Err(e) => {
+          tracing::warn!(error = %e, "環境変数 CHANNEL_ID の取得に失敗しました");
+          return;
+        }
+      };
+      let result = pin(&ctx, channel_id).await;
       match result {
         Ok(_) => {
           tracing::info!("ピンメッセージの更新に成功しました");
