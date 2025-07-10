@@ -1,0 +1,24 @@
+name: code format for rust
+
+on:
+  push:
+    paths:
+      - '**/*.rs'
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    name: code format
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: setup rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt
+      - name: run format
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
