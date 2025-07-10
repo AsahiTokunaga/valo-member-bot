@@ -1,68 +1,65 @@
-use tokio::sync::{OnceCell, RwLock};
+pub mod commands {
 
-use anyhow::Result as AnyhowResult;
-use redis::aio::ConnectionManager;
-use redis::{AsyncCommands, Client};
+  use redis::{AsyncCommands, Client, aio::ConnectionManager};
+  use tracing::{Level, instrument};
 
-static VALKEY_CONNECTION: OnceCell<RwLock<ConnectionManager>> = OnceCell::const_new();
+  use crate::error::BotError;
 
-pub struct Valkey;
+  #[instrument(name = "valkey/commands/new", err, level = Level::WARN, skip_all)]
+  async fn new(redis_pass: &str) -> Result<ConnectionManager, BotError> {
+    let client = Client::open(format!("redis://:{}@127.0.0.1/", redis_pass))?;
+    let manager = ConnectionManager::new(client).await?;
+    Ok(manager)
+  }
 
-impl Valkey {
-    fn new(
-        redis_pass: &str,
-    ) -> impl Future<Output = AnyhowResult<&'static RwLock<ConnectionManager>>> {
-        VALKEY_CONNECTION.get_or_try_init(move || async move {
-            let client = Client::open(format!("redis://:{}@127.0.0.1/", redis_pass))?;
-            let manager = ConnectionManager::new(client).await?;
-            Ok(RwLock::new(manager))
-        })
-    }
+  #[instrument(name = "valkey/commands/ping", level = Level::INFO, err(level = Level::WARN), skip_all)]
+  pub async fn ping(redis_pass: &str) -> Result<(), BotError> {
+    let mut connection = new(redis_pass).await?;
+    let pong: String = connection.ping().await?;
+    tracing::info!("Redisに接続しました: {}", pong);
+    Ok(())
+  }
 
-    pub async fn ping(redis_pass: &str) -> AnyhowResult<()> {
-        let lock = Self::new(redis_pass).await?;
-        let mut connection = lock.write().await;
-        let pong: String = connection.ping().await?;
-        println!("[ OK ] Redisに接続しました: {}", pong);
-        Ok(())
-    }
+  #[instrument(name = "valkey/commands/set", level = Level::INFO, err(level = Level::WARN), skip_all, fields(key = %key, value = %value))]
+  pub async fn set(
+    redis_pass: &str,
+    key: &str,
+    value: &str,
+  ) -> Result<(), BotError> {
+    let mut connection = new(redis_pass).await?;
+    connection.set::<&str, &str, ()>(key, value).await?;
+    tracing::info!("Redisに値をセットしました");
+    Ok(())
+  }
 
-    pub fn set<'a>(
-        redis_pass: &'a str,
-        key: &'a str,
-        value: &'a str,
-    ) -> impl Future<Output = AnyhowResult<()>> + 'a {
-        async move {
-            let lock = Self::new(redis_pass).await?;
-            let mut connection = lock.write().await;
-            connection.set::<&str, &str, ()>(key, value).await?;
-            Ok(())
-        }
-    }
+  #[instrument(name = "valkey/commands/get", level = Level::INFO, err(level = Level::WARN), skip_all, fields(key = %key))]
+  pub async fn get(
+    redis_pass: &str,
+    key: &str,
+  ) -> Result<Option<String>, BotError> {
+    let mut connection = new(redis_pass).await?;
+    let value: Option<String> = connection.get(key).await?;
+    Ok(value)
+  }
 
-    pub fn get<'a>(
-        redis_pass: &'a str,
-        key: &'a str,
-    ) -> impl Future<Output = AnyhowResult<Option<String>>> + 'a {
-        async move {
-            let lock = Self::new(redis_pass).await?;
-            let mut connection = lock.write().await;
-            let value: Option<String> = connection.get(key).await?;
-            Ok(value)
-        }
-    }
+  #[instrument(name = "valkey/commands/ttl_set", level = Level::INFO, err(level = Level::WARN), skip_all, fields(key = %key, value = %value, ttl))]
+  pub async fn ttl_set(
+    redis_pass: &str,
+    key: &str,
+    value: &str,
+    ttl: u64,
+  ) -> Result<(), BotError> {
+    let mut connection = new(redis_pass).await?;
+    connection.set_ex::<&str, &str, ()>(key, value, ttl).await?;
+    Ok(())
+  }
 
-    pub fn ttl_set<'a>(
-        redis_pass: &'a str,
-        key: &'a str,
-        val: &'a str,
-        ttl: u64,
-    ) -> impl Future<Output = AnyhowResult<()>> + 'a {
-        async move {
-            let lock = Self::new(redis_pass).await?;
-            let mut connection = lock.write().await;
-            connection.set_ex::<&str, &str, ()>(key, val, ttl).await?;
-           Ok(())
-        }
-    }
+  pub async fn del(
+    redis_pass: &str,
+    key: &str,
+  ) -> Result<(), BotError> {
+    let mut connection = new(redis_pass).await?;
+    connection.del::<&str, ()>(key).await?;
+    Ok(())
+  }
 }
