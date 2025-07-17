@@ -1,35 +1,6 @@
 # valo-member-bot
 
-TODO:下記構造に変更
-```
-
-src/
-├── main.rs
-├── config.rs
-├── error.rs
-├── db.rs
-└── bot/
-    ├── handler.rs
-    ├── panel.rs
-    ├── buttons.rs
-    ├── state.rs
-    ├── colors.rs
-    ├── state/
-    │   └── types.rs
-    ├── buttons/
-    │   ├── join.rs
-    │   ├── leave.rs
-    │   └── delete.rs
-    ├── questions/
-    │   ├── flow.rs
-    │   ├── server.rs
-    │   ├── mode.rs
-    │   ├── member.rs
-    │   ├── rank.rs
-    │   └── message.rs
-    └── panel/
-        ├── send.rs
-        ├── edit.rs
-        └── entry.rs
-
-```
+todo:<br>
+bot.rs: EventHandler実装でのInteraction振り分け時、必要な場合defer()を付ける<br>
+bot.rs内でquestion_stateへのデータ挿入を行う<br>
+ModalInteractionを受け取ったときにquestion_stateから取得したWebhookDataをpanels::send()に渡し、呼ぶ

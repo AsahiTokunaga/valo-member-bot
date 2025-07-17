@@ -1,6 +1,6 @@
 [package]
 name = "valo-member-bot"
-version = "0.1.0"
+version = "2025.1.0"
 edition = "2024"
 
 [dependencies]
