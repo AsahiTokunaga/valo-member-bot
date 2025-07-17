@@ -1,6 +1,6 @@
 [package]
 name = "valo-member-bot"
-version = "0.1.0"
+version = "2025.1.0"
 edition = "2024"
 
 [dependencies]
@@ -26,3 +26,9 @@ tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1.41"
 tracing-attributes = "0.1.30"
 tracing-subscriber = "0.3.19"
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1
+lto = "thin"
+panic = "abort"
