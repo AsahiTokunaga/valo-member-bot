@@ -171,7 +171,7 @@ impl EventHandler for Handler {
                   .ok();
               }
               Ok(buttons::JoinResponse::Expired) => {
-                buttons::expired(&ctx.http, &component, &mut self.get_redis_client().await).await;
+                panels::handle_expired(&ctx.http, &component, &mut self.get_redis_client().await).await;
               }
               Err(e) => tracing::warn!(error = %e, "Failed to join"),
             }
@@ -211,7 +211,7 @@ impl EventHandler for Handler {
                   .ok();
               }
               Ok(LeaveResponse::Expired) => {
-                buttons::expired(&ctx.http, &component, &mut redis_client).await;
+                panels::handle_expired(&ctx.http, &component, &mut redis_client).await;
               }
               Err(e) => tracing::warn!(error = %e, "Failed to leave"),
             }
@@ -251,7 +251,7 @@ impl EventHandler for Handler {
                   .ok();
               }
               Ok(DeleteResponse::Expired) => {
-                buttons::expired(&ctx.http, &component, &mut redis_client).await;
+                panels::handle_expired(&ctx.http, &component, &mut redis_client).await;
               }
               Err(e) => tracing::warn!(error = %e, "Failed to delete"),
             }
