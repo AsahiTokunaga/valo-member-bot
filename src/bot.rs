@@ -4,11 +4,12 @@ pub mod types;
 pub mod colors;
 pub mod panels;
 
+use dashmap::DashMap;
 use serenity::{
   all::{ActionRowComponent, ChannelId, ComponentInteraction, ComponentInteractionDataKind, Context, CreateInteractionResponse, CreateInteractionResponseMessage, EventHandler, Interaction, Message, Ready, UserId},
   async_trait,
 };
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 use types::WebhookData;
 
@@ -16,8 +17,8 @@ use crate::{bot::{buttons::{DeleteResponse, LeaveResponse}, types::{ApServer, Me
 
 #[derive(Clone)]
 pub struct Handler {
-  pub question_state: Arc<Mutex<HashMap<UserId, WebhookData>>>,
-  pub component_store: Arc<Mutex<HashMap<UserId, ComponentInteraction>>>,
+  pub question_state: DashMap<UserId, WebhookData>,
+  pub component_store: DashMap<UserId, ComponentInteraction>,
   pub redis_client: Arc<Mutex<RedisClient>>,
 }
 

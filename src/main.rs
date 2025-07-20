@@ -2,8 +2,9 @@ mod bot;
 mod config;
 mod error;
 
-use std::{collections::HashMap,sync::Arc};
+use std::sync::Arc;
 
+use dashmap::DashMap;
 use error::BotError;
 use bot::Handler;
 use serenity::all::GatewayIntents;
@@ -16,17 +17,16 @@ use crate::bot::types::RedisClient;
 #[tokio::main(flavor = "multi_thread")]
 #[instrument(name = "main", err)]
 async fn main() -> Result<(), BotError> {
-  let logger = tracing_subscriber::fmt::Subscriber::builder()
+  tracing_subscriber::fmt()
     .with_max_level(Level::INFO)
     .with_timer(JapanStandardTime)
-    .finish();
-  tracing::subscriber::set_global_default(logger)?;
+    .init();
   config::load()?;
   let token = config::get("TOKEN")?;
   let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
   let handler = Handler {
-    question_state: Arc::new(Mutex::new(HashMap::new())),
-    component_store: Arc::new(Mutex::new(HashMap::new())),
+    question_state: DashMap::new(),
+    component_store: DashMap::new(),
     redis_client: Arc::new(Mutex::new(RedisClient::new(&config::get("REDIS_PASS")?).await?)),
   };
   let mut client = serenity::Client::builder(token, intents)

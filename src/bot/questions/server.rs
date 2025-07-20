@@ -7,9 +7,7 @@ impl Handler {
   where
     T: CacheHttp + Send + Sync,
   {
-    let mut component_store = self.component_store.lock().await;
-    component_store.insert(user, comp.clone());
-    drop(component_store);
+    self.component_store.insert(user, comp.clone());
     let embed = CreateEmbed::new()
       .title("サーバーを選択してください")
       .color(BASE_COLOR);
