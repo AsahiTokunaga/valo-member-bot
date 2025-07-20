@@ -8,7 +8,6 @@ use dashmap::DashMap;
 use error::BotError;
 use bot::Handler;
 use serenity::all::GatewayIntents;
-use tokio::sync::Mutex;
 use tracing::{Level, instrument};
 use tracing_subscriber::fmt::time::FormatTime;
 
@@ -27,7 +26,7 @@ async fn main() -> Result<(), BotError> {
   let handler = Handler {
     question_state: DashMap::new(),
     component_store: DashMap::new(),
-    redis_client: Arc::new(Mutex::new(RedisClient::new(&config::get("REDIS_PASS")?).await?)),
+    redis_client: Arc::new(RedisClient::new(&config::get("REDIS_PASS")?).await?),
   };
   let mut client = serenity::Client::builder(token, intents)
     .event_handler_arc(Arc::new(handler))

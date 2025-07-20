@@ -8,7 +8,7 @@ pub enum JoinResponse {
     Expired,
 }
 
-pub async fn join(redis_client: &mut RedisClient, join_user: UserId, message: MessageId) -> Result<JoinResponse, BotError> {
+pub async fn join(redis_client: &RedisClient, join_user: UserId, message: MessageId) -> Result<JoinResponse, BotError> {
   let webhook_data = match redis_client.get_webhook_data(message).await {
         Ok(data) => data,
         Err(_) => return Ok(JoinResponse::Expired),

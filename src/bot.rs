@@ -10,7 +10,6 @@ use serenity::{
   async_trait,
 };
 use std::{str::FromStr, sync::Arc};
-use tokio::sync::Mutex;
 use types::WebhookData;
 
 use crate::{bot::{buttons::{DeleteResponse, LeaveResponse}, types::{ApServer, Member, Mode, Rank, RedisClient, WebhookDataExt}}, config};
@@ -19,7 +18,7 @@ use crate::{bot::{buttons::{DeleteResponse, LeaveResponse}, types::{ApServer, Me
 pub struct Handler {
   pub question_state: DashMap<UserId, WebhookData>,
   pub component_store: DashMap<UserId, ComponentInteraction>,
-  pub redis_client: Arc<Mutex<RedisClient>>,
+  pub redis_client: Arc<RedisClient>,
 }
 
 #[async_trait]
@@ -53,14 +52,12 @@ impl EventHandler for Handler {
       }
     };
     if msg.author.id.to_string() != bot {
-      let mut redis_client = self.redis_client.lock().await;
-      match panels::entry(&ctx.http, &mut redis_client).await {
+      match panels::entry(&ctx.http, &self.redis_client).await {
         Err(e) => {
           tracing::warn!(error = %e, "Failed to update entry panel");
         }
         _ => {}
       }
-      drop(redis_client);
     }
   }
   async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -129,8 +126,7 @@ impl EventHandler for Handler {
             }
           }
           "参加する" => {
-            let mut redis_client = self.get_redis_client().await;
-            match buttons::join(&mut redis_client, component.user.id, component.message.id).await {
+            match buttons::join(&self.redis_client, component.user.id, component.message.id).await {
               Ok(buttons::JoinResponse::Joined) => {
                 component.create_response(&ctx.http, CreateInteractionResponse::Message(
                   CreateInteractionResponseMessage::new()
@@ -139,12 +135,12 @@ impl EventHandler for Handler {
                 )).await.map_err(|e| {
                   tracing::warn!(error = %e, "Failed to create join response");
                 }).ok();
-                let is_fill = panels::edit(&ctx.http, &mut redis_client, component.message.id).await.map_err(|e| {
+                let is_fill = panels::edit(&ctx.http, &self.redis_client, component.message.id).await.map_err(|e| {
                   tracing::warn!(error = %e, "Failed to edit panel after join");
                 });
                 if let Ok(if_fill) = is_fill {
                   if !if_fill { return; }
-                  match redis_client.get_webhook_data(component.message.id).await {
+                  match self.redis_client.get_webhook_data(component.message.id).await {
                     Err(e) => tracing::warn!(error = %e, "Failed to get webhook data after join"),
                     Ok(webhook_data) => {
                       let joined_users = webhook_data.joined.iter()
@@ -170,14 +166,13 @@ impl EventHandler for Handler {
                   .ok();
               }
               Ok(buttons::JoinResponse::Expired) => {
-                panels::handle_expired(&ctx.http, &component, &mut self.get_redis_client().await).await;
+                panels::handle_expired(&ctx.http, &component, &self.redis_client).await;
               }
               Err(e) => tracing::warn!(error = %e, "Failed to join"),
             }
           }
           "参加をやめる" => {
-            let mut redis_client = self.get_redis_client().await;
-            match buttons::leave(&mut redis_client, component.user.id, component.message.id).await {
+            match buttons::leave(&self.redis_client, component.user.id, component.message.id).await {
               Ok(LeaveResponse::Left) => {
                 component.create_response(&ctx.http, CreateInteractionResponse::Message(
                   CreateInteractionResponseMessage::new()
@@ -186,7 +181,7 @@ impl EventHandler for Handler {
                 )).await
                   .map_err(|e| tracing::warn!(error = %e, "Failed to create leave response"))
                   .ok();
-                panels::edit(&ctx.http, &mut redis_client, component.message.id)
+                panels::edit(&ctx.http, &self.redis_client, component.message.id)
                   .await
                   .map_err(|e| tracing::warn!(error = %e, "Failed to edit panel after leave"))
                   .ok();
@@ -210,14 +205,13 @@ impl EventHandler for Handler {
                   .ok();
               }
               Ok(LeaveResponse::Expired) => {
-                panels::handle_expired(&ctx.http, &component, &mut redis_client).await;
+                panels::handle_expired(&ctx.http, &component, &self.redis_client).await;
               }
               Err(e) => tracing::warn!(error = %e, "Failed to leave"),
             }
           }
           "削除" => {
-            let mut redis_client = self.get_redis_client().await;
-            match buttons::delete(&mut redis_client, component.user.id, component.message.id).await {
+            match buttons::delete(&self.redis_client, component.user.id, component.message.id).await {
               Ok(DeleteResponse::Deleted) => {
                 component.create_response(&ctx.http, CreateInteractionResponse::Message(
                   CreateInteractionResponseMessage::new()
@@ -226,7 +220,7 @@ impl EventHandler for Handler {
                 )).await
                   .map_err(|e| tracing::warn!(error = %e, "Failed to create delete response"))
                   .ok();
-                panels::delete(&ctx.http, &mut redis_client, component.message.id)
+                panels::delete(&ctx.http, &self.redis_client, component.message.id)
                   .await
                   .map_err(|e| tracing::warn!(error = %e, "Failed to delete panel after deletion"))
                   .ok();
@@ -250,7 +244,7 @@ impl EventHandler for Handler {
                   .ok();
               }
               Ok(DeleteResponse::Expired) => {
-                panels::handle_expired(&ctx.http, &component, &mut redis_client).await;
+                panels::handle_expired(&ctx.http, &component, &self.redis_client).await;
               }
               Err(e) => tracing::warn!(error = %e, "Failed to delete"),
             }
@@ -268,8 +262,7 @@ impl EventHandler for Handler {
             }
           };
           let _ = component.defer(&ctx.http).await;
-          let mut redis_client = self.get_redis_client().await;
-          match panels::send(&ctx.http, &mut redis_client, &webhook_data, input.value.as_deref()).await {
+          match panels::send(&ctx.http, &self.redis_client, &webhook_data, input.value.as_deref()).await {
             Err(e) => tracing::warn!(error = %e, "Failed to send webhook message"),
             _ => {}
           }

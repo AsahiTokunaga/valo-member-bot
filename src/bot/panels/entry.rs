@@ -5,7 +5,7 @@ use serenity::all::{ButtonStyle, CacheHttp, ChannelId, CreateActionRow, CreateBu
 
 use crate::{bot::{colors::PIN_MESSAGE_COLOR, types::RedisClient}, config, error::{BotError, DbError}};
 
-pub async fn entry<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient) -> Result<(), BotError> {
+pub async fn entry<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &RedisClient) -> Result<(), BotError> {
   if !is_updatable(http, redis_client).await? { return Ok(()); }
   delete_latest(http, redis_client).await?;
   let embed = CreateEmbed::new()
@@ -26,7 +26,7 @@ pub async fn entry<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mu
   Ok(())
 }
 
-async fn delete_latest<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient) -> Result<(), BotError> {
+async fn delete_latest<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &RedisClient) -> Result<(), BotError> {
   let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
   let channel = ChannelId::from_str(&config::get("CHANNEL_ID")?)?;
   match conn.get("latest_entry").await {
@@ -39,7 +39,7 @@ async fn delete_latest<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client:
   }
 }
 
-async fn is_updatable<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient) -> Result<bool, BotError> {
+async fn is_updatable<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &RedisClient) -> Result<bool, BotError> {
   let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
   let latest_entry: Option<String> = conn.get("latest_entry").await.map_err(DbError::from)?;
   if let Some(message_id) = latest_entry {

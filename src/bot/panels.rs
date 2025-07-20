@@ -48,7 +48,7 @@ pub fn get_thumbnail(rank: Option<Rank>) -> Result<String, BotError> {
   }
 }
 
-pub async fn handle_expired<T>(http: T, component: &ComponentInteraction, redis_client: &mut RedisClient)
+pub async fn handle_expired<T>(http: T, component: &ComponentInteraction, redis_client: &RedisClient)
 where
   T: AsRef<Http> + CacheHttp + Copy,
 {

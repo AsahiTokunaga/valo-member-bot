@@ -10,7 +10,7 @@ pub enum LeaveResponse {
   Expired,
 }
 
-pub async fn leave(redis_client: &mut RedisClient, leave_user: UserId, message: MessageId) -> Result<LeaveResponse, BotError> {
+pub async fn leave(redis_client: &RedisClient, leave_user: UserId, message: MessageId) -> Result<LeaveResponse, BotError> {
   let webhook_data = match redis_client.get_webhook_data(message).await {
         Ok(data) => data,
         Err(_) => return Ok(LeaveResponse::Expired),

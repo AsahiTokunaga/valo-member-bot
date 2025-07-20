@@ -5,7 +5,7 @@ mod rank;
 mod server;
 
 use crate::{
-  bot::{types::{RedisClient, WebhookData}, Handler},
+  bot::{types::WebhookData, Handler},
   error::BotError,
 };
 use serenity::all::{ComponentInteraction, UserId};
@@ -33,10 +33,6 @@ impl Handler {
   pub async fn get_component(&self, id: UserId) -> Option<ComponentInteraction> {
     self.component_store.get(&id)
       .map(|comp| comp.clone())
-  }
-  pub async fn get_redis_client(&self) -> RedisClient {
-    let lock = self.redis_client.lock().await;
-    lock.clone()
   }
   pub async fn remove_temp_data(&self, id: UserId) -> Result<(), BotError> {
     if self.question_state.remove(&id).is_none() {

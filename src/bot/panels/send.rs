@@ -11,7 +11,7 @@ use crate::{
   error::BotError
 };
 
-pub async fn send<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient, webhook_data: &WebhookData, cont: Option<&str>) -> Result<(), BotError> {
+pub async fn send<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &RedisClient, webhook_data: &WebhookData, cont: Option<&str>) -> Result<(), BotError> {
   let webhook = redis_client.get_webhook(http);
   let joined_users: String = webhook_data.joined
     .iter()

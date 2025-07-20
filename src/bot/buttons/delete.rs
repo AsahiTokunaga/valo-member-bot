@@ -10,7 +10,7 @@ pub enum DeleteResponse {
   Expired,
 }
 
-pub async fn delete(redis_client: &mut RedisClient, delete_user: UserId, message: MessageId) -> Result<DeleteResponse, BotError> {
+pub async fn delete(redis_client: &RedisClient, delete_user: UserId, message: MessageId) -> Result<DeleteResponse, BotError> {
   let webhook_data = match redis_client.get_webhook_data(message).await {
         Ok(data) => data,
         Err(_) => return Ok(DeleteResponse::Expired),

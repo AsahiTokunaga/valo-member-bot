@@ -2,7 +2,7 @@ use serenity::all::{CacheHttp, CreateEmbed, EditWebhookMessage, Http, MessageId}
 
 use crate::{bot::{panels::get_button, types::RedisClient}, error::BotError};
 
-pub async fn edit<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient, message: MessageId)  -> Result<bool, BotError>{
+pub async fn edit<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &RedisClient, message: MessageId)  -> Result<bool, BotError>{
   let webhook_data = redis_client.get_webhook_data(message).await?;
   let webhook = redis_client.get_webhook(http).await?;
   let old_message = webhook.get_message(http, None, message).await?;
