@@ -32,14 +32,12 @@ pub async fn send<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut
     .field("参加者", joined_users, false);
   let buttons = get_button(false);
   let creator = webhook_data.creator.to_user(http).await?;
-  let mut webhook_message = ExecuteWebhook::new()
+  let webhook_message = ExecuteWebhook::new()
     .username(creator.display_name())
     .avatar_url(creator.face())
     .embed(embed)
+    .content(cont.map_or(format!("{}", webhook_data.mode.to_mention_str()), |f| format!("{} {}", webhook_data.mode.to_mention_str(), f)))
     .components(vec![buttons]);
-  if let Some(content) = cont {
-    webhook_message = webhook_message.content(content);
-  }
 
   // 第2引数がtrueのため必ずSomeを返す
   // 詳細: https://docs.rs/serenity/latest/serenity/http/struct.Http.html#method.execute_webhook

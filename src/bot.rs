@@ -55,12 +55,10 @@ impl EventHandler for Handler {
     if msg.author.id.to_string() != bot {
       let mut redis_client = self.redis_client.lock().await;
       match panels::entry(&ctx.http, &mut redis_client).await {
-        Ok(_) => {
-          tracing::info!("Entry panel update successfully");
-        }
         Err(e) => {
           tracing::warn!(error = %e, "Failed to update entry panel");
         }
+        _ => {}
       }
       drop(redis_client);
     }

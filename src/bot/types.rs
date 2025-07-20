@@ -211,6 +211,15 @@ impl FromStr for Mode {
       .ok_or("Invalid mode")
   }
 }
+impl Mode {
+  pub fn to_mention_str(&self) -> String {
+    match self {
+      Mode::Unrated => format!("<@&{}>", config::get("UNRATED_MENTION_ID").unwrap_or_default()),
+      Mode::Competitive => format!("<@&{}>", config::get("COMPETITIVE_MENTION_ID").unwrap_or_default()),
+      Mode::Custom => format!("<@&{}>", config::get("CUSTOM_MENTION_ID").unwrap_or_default()),
+    }
+  }
+}
 
 impl WebhookDataExt for Rank {
   fn variants() -> impl Iterator<Item = Self> {
