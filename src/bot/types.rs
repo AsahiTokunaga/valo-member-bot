@@ -97,17 +97,24 @@ impl RedisClient {
       .map(|u| format!("{}", u.get()))
       .collect::<Vec<String>>()
       .join(",");
-    let fields_value = [
-      ("creator", creator.as_str()),
-      ("server", data.server.as_str()),
-      ("mode", data.mode.as_str()),
-      ("rank", data.rank.map_or("None", |r| r.as_str())),
-      ("member", data.member.as_str()),
-      ("joined", joined_user.as_str()),
+    let fields_value: [(&str, String); 6] = [
+      ("creator", creator),
+      ("server", data.server.as_str().to_string()),
+      ("mode", data.mode.as_str().to_string()),
+      ("rank", data.rank.map_or("None".to_string(), |r| r.as_str().to_string())),
+      ("member", data.member.as_str().to_string()),
+      ("joined", joined_user.as_str().to_string()),
     ];
-    let mut conn = self.connection.get().await.map_err(DbError::from)?;
-    conn.hset_multiple(id.get(), &fields_value).await.map_err(DbError::from)?;
-    conn.expire(id.get(), THREE_DAYS_SECONDS).await.map_err(DbError::from)?;
+    let conn = self.connection.get().await.map_err(DbError::from)?;
+    tokio::spawn(async move {
+      let mut conn = conn;
+      if let Err(e) = conn.hset_multiple(id.get(), &fields_value).await {
+        tracing::error!(error = %e, "Failed to store webhook data");
+      }
+      if let Err(e) = conn.expire(id.get(), THREE_DAYS_SECONDS).await {
+        tracing::error!(error = %e, "Failed to set expiration for webhook data");
+      }
+    });
     Ok(())
   }
   pub async fn get_webhook_data(&self, id: MessageId) -> Result<WebhookData, BotError> {
@@ -153,8 +160,12 @@ impl RedisClient {
       None => {
         let webhook = CreateWebhook::new("Valo Member Bot Webhook")
           .execute(http, channel).await?;
-        conn.set("webhook_url", webhook.url()?).await.map_err(DbError::from)?;
-        drop(conn);
+        tokio::spawn(async move {
+          let mut conn = conn;
+          if let Err(e) = conn.set("webhook_url", &webhook_url).await {
+            tracing::warn!(error = %e, "Failed to store webhook URL in Redis");
+          }
+        });
         Ok(webhook)
       }
     }
