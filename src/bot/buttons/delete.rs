@@ -1,7 +1,7 @@
 use redis::AsyncTypedCommands;
 use serenity::all::{MessageId, UserId};
 
-use crate::{bot::types::RedisClient, error::BotError};
+use crate::{bot::types::RedisClient, error::{BotError, DbError}};
 
 pub enum DeleteResponse {
   NotCreator,
@@ -21,8 +21,8 @@ pub async fn delete(redis_client: &mut RedisClient, delete_user: UserId, message
   if !webhook_data.joined.contains(&delete_user) {
     return Ok(DeleteResponse::NotJoined);
   } else {
-    let mut conn = redis_client.connection.lock().await;
-    conn.del(message.get()).await?;
+    let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
+    conn.del(message.get()).await.map_err(DbError::from)?;
     drop(conn);
     Ok(DeleteResponse::Deleted)
   }

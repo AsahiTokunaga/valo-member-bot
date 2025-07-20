@@ -1,5 +1,6 @@
 use std::num::ParseIntError;
 
+use deadpool_redis::PoolError;
 use redis::RedisError;
 use thiserror::Error;
 use tracing::subscriber::SetGlobalDefaultError;
@@ -7,7 +8,7 @@ use tracing::subscriber::SetGlobalDefaultError;
 #[derive(Debug, Error)]
 pub enum BotError {
   #[error("[BotError::DbError] {0}")]
-  DbError(#[from] RedisError),
+  DbError(#[from] DbError),
   #[error("[BotError::ConfigError] {0}")]
   ConfigError(#[from] dotenv::Error),
   #[error("[BotError::SerenityError] {0}")]
@@ -22,4 +23,12 @@ pub enum BotError {
   ComponentInteractionNotFound,
   #[error("[BotError::EmbedBroken] Embedが壊れています {0}")]
   EmbedBroken(&'static str),
+}
+
+#[derive(Debug, Error)]
+pub enum DbError {
+  #[error("[DbError::PoolError] {0}")]
+  PoolError(#[from] PoolError),
+  #[error("[DbError::RedisError] {0}")]
+  RedisError(#[from] RedisError),
 }

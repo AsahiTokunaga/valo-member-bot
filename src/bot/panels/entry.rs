@@ -3,7 +3,7 @@ use std::str::FromStr;
 use redis::AsyncTypedCommands;
 use serenity::all::{ButtonStyle, CacheHttp, ChannelId, CreateActionRow, CreateButton, CreateEmbed, CreateMessage, Http, MessageId};
 
-use crate::{bot::{colors::PIN_MESSAGE_COLOR, types::RedisClient}, config, error::BotError};
+use crate::{bot::{colors::PIN_MESSAGE_COLOR, types::RedisClient}, config, error::{BotError, DbError}};
 
 pub async fn entry<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient) -> Result<(), BotError> {
   delete_latest(http, redis_client).await?;
@@ -19,14 +19,14 @@ pub async fn entry<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mu
     ])]);
   let channel = ChannelId::from_str(&config::get("CHANNEL_ID")?)?;
   let latest_entry = channel.send_message(http, entry_panel).await?;
-  let mut conn = redis_client.connection.lock().await;
-  conn.set("latest_entry", latest_entry.id.get()).await?;
+  let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
+  conn.set("latest_entry", latest_entry.id.get()).await.map_err(DbError::from)?;
   drop(conn);
   Ok(())
 }
 
 async fn delete_latest<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient) -> Result<(), BotError> {
-  let mut conn = redis_client.connection.lock().await;
+  let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
   let channel = ChannelId::from_str(&config::get("CHANNEL_ID")?)?;
   match conn.get("latest_entry").await {
     Ok(Some(message_id)) => {

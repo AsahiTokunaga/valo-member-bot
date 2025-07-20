@@ -1,14 +1,14 @@
-use redis::{aio::ConnectionManager, AsyncTypedCommands, Client};
+use deadpool_redis::{Config, Pool, Runtime};
+use redis::AsyncTypedCommands;
 use serenity::all::{Builder, CacheHttp, ChannelId, CreateWebhook, Http, MessageId, UserId, Webhook};
-use tokio::sync::Mutex;
-use std::{str::FromStr, sync::Arc};
-use crate::{bot::colors::*, config, error::BotError};
+use std::{collections::HashMap, str::FromStr};
+use crate::{bot::colors::*, config, error::{BotError, DbError}};
 
 const THREE_DAYS_SECONDS: i64 = 3 * 24 * 60 * 60;
 
 #[derive(Clone)]
 pub struct RedisClient {
-  pub connection: Arc<Mutex<ConnectionManager>>,
+  pub connection: Pool,
 }
 
 pub trait WebhookDataExt: Sized {
@@ -85,10 +85,10 @@ impl WebhookData {
 
 impl RedisClient {
   pub async fn new(redis_pass: &str) -> Result<Self, BotError> {
-    let client = Client::open(format!("redis://:{}@127.0.0.1/", redis_pass))?;
-    let conn = ConnectionManager::new(client).await?;
+    let cfg = Config::from_url(format!("redis://:{}@127.0.0.1/", redis_pass));
+    let pool = cfg.create_pool(Some(Runtime::Tokio1)).unwrap();
     Ok(Self {
-      connection: Arc::new(Mutex::new(conn)),
+      connection: pool,
     })
   }
   pub async fn store_webhook_data(&self, id: MessageId, data: &WebhookData) -> Result<(), BotError> {
@@ -105,15 +105,14 @@ impl RedisClient {
       ("member", data.member.as_str()),
       ("joined", joined_user.as_str()),
     ];
-    let mut conn = self.connection.lock().await;
-    conn.hset_multiple(id.get(), &fields_value).await?;
-    conn.expire(id.get(), THREE_DAYS_SECONDS).await?;
-    drop(conn);
+    let mut conn = self.connection.get().await.map_err(DbError::from)?;
+    conn.hset_multiple(id.get(), &fields_value).await.map_err(DbError::from)?;
+    conn.expire(id.get(), THREE_DAYS_SECONDS).await.map_err(DbError::from)?;
     Ok(())
   }
   pub async fn get_webhook_data(&self, id: MessageId) -> Result<WebhookData, BotError> {
-    let mut conn = self.connection.lock().await;
-    let hash_set = conn.hgetall(id.get()).await?;
+    let mut conn = self.connection.get().await.map_err(DbError::from)?;
+    let hash_set: HashMap<String, String> = conn.hgetall(id.get()).await.map_err(DbError::from)?;
     drop(conn);
     let creator = UserId::from_str(hash_set.get("creator").ok_or(BotError::WebhookDataNotFound)?)
       .map_err(|_| BotError::WebhookDataNotFound)?;
@@ -144,18 +143,17 @@ impl RedisClient {
   }
   pub async fn get_webhook<T: AsRef<Http> + CacheHttp + Copy>(&self, http: T) -> Result<Webhook, BotError> {
     let channel = ChannelId::from_str(&config::get("CHANNEL_ID")?)?;
-    let mut conn = self.connection.lock().await;
-    let webhook_url = conn.get("webhook_url").await?;
+    let mut conn = self.connection.get().await.map_err(DbError::from)?;
+    let webhook_url: Option<String> = conn.get("webhook_url").await.map_err(DbError::from)?;
     match webhook_url {
       Some(url) => {
-        drop(conn);
         let webhook = Webhook::from_url(http, &url).await?;
         Ok(webhook)
       }
       None => {
         let webhook = CreateWebhook::new("Valo Member Bot Webhook")
           .execute(http, channel).await?;
-        conn.set("webhook_url", webhook.url()?).await?;
+        conn.set("webhook_url", webhook.url()?).await.map_err(DbError::from)?;
         drop(conn);
         Ok(webhook)
       }

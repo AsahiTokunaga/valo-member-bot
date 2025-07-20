@@ -1,6 +1,6 @@
 use redis::AsyncTypedCommands;
 use serenity::all::{MessageId, UserId};
-use crate::{bot::types::RedisClient, error::BotError};
+use crate::{bot::types::RedisClient, error::{BotError, DbError}};
 
 pub enum JoinResponse {
     AlreadyJoined,
@@ -22,8 +22,8 @@ pub async fn join(redis_client: &mut RedisClient, join_user: UserId, message: Me
       .map(|u| format!("{}", u.get()))
       .collect::<Vec<String>>()
       .join(",");
-    let mut conn = redis_client.connection.lock().await;
-    conn.hset(message.get(), "joined", joined_string).await?;
+    let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
+    conn.hset(message.get(), "joined", joined_string).await.map_err(DbError::from)?;
     drop(conn);
     Ok(JoinResponse::Joined)
   }
