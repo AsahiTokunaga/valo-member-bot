@@ -6,7 +6,7 @@ pub mod panels;
 
 use dashmap::DashMap;
 use serenity::{
-  all::{ActionRowComponent, ChannelId, ComponentInteraction, ComponentInteractionDataKind, Context, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, EventHandler, Interaction, Message, Ready, UserId},
+  all::{ActionRowComponent, ChannelId, ComponentInteraction, ComponentInteractionDataKind, Context, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, EventHandler, ExecuteWebhook, Interaction, Message, Ready, UserId},
   async_trait,
 };
 use std::{str::FromStr, sync::Arc};
@@ -32,17 +32,37 @@ impl EventHandler for Handler {
     {
       tokio::spawn({
         let http = ctx.http.clone();
+        let webhook = self.redis_client.get_webhook(&http).await.map_err(|e| {
+          tracing::warn!(error = %e, "Failed to get webhook");
+        }).ok().unwrap();
         async move {
-          if let Err(e) = msg.channel_id.send_message(&http, CreateMessage::new().add_embed(CreateEmbed::new()
-            .title("BUMP通知を検知しました")
-            .description("BUMPありがとう！2時間後にまたBUMPしてね！"))).await 
-          {
+          let execute_webhook = ExecuteWebhook::new()
+            .avatar_url(format!(
+              "{}bell-logo.jpg",
+              config::get("BASE_IMG_URL")
+                .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
+            ))
+            .username("BUMP Reminder")
+            .embed(CreateEmbed::new()
+              .title("BUMP通知を検知しました")
+              .description("BUMPありがとう！2時間後にまたBUMPしてね！")
+            );
+          if let Err(e) = webhook.execute(&http, false, execute_webhook).await {
             tracing::warn!(error = %e, "Failed to send BUMP notification");
           } else {
+            let execute_webhook = ExecuteWebhook::new()
+              .avatar_url(format!(
+                "{}bell-logo.jpg",
+                config::get("BASE_IMG_URL")
+                  .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
+              ))
+              .username("BUMP Reminder")
+              .embed(CreateEmbed::new()
+                .title("BUMPの時間です")
+                .description("BUMPしてこのサーバーをより盛り上げることにご協力ください！")
+              );
             tokio::time::sleep(tokio::time::Duration::from_secs(2 * 60 * 60)).await;
-            if let Err(e) = msg.channel_id.send_message(&http, CreateMessage::new().add_embed(CreateEmbed::new()
-              .title("BUMPの時間です")
-              .description("BUMPしてこのサーバーをより盛り上げることにご協力ください！"))).await
+            if let Err(e) = webhook.execute(&http, false, execute_webhook).await 
             {
               tracing::warn!(error = %e, "Failed to send BUMP reminder");
             }
