@@ -6,13 +6,13 @@ pub mod panels;
 
 use dashmap::DashMap;
 use serenity::{
-  all::{ActionRowComponent, ChannelId, ComponentInteraction, ComponentInteractionDataKind, Context, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, EventHandler, ExecuteWebhook, Interaction, Message, Ready, UserId},
+  all::{ActionRowComponent, ChannelId, ComponentInteraction, ComponentInteractionDataKind, Context, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, EventHandler, ExecuteWebhook, Interaction, Message, Ready, UserId, Webhook},
   async_trait,
 };
 use std::{str::FromStr, sync::Arc};
 use types::WebhookData;
 
-use crate::{bot::{buttons::{DeleteResponse, LeaveResponse}, types::{ApServer, Member, Mode, Rank, RedisClient, WebhookDataExt}}, config};
+use crate::{bot::{buttons::{DeleteResponse, JoinResponse, LeaveResponse}, types::{ApServer, Member, Mode, Rank, RedisClient, WebhookDataExt}}, config};
 
 #[derive(Clone)]
 pub struct Handler {
@@ -32,9 +32,10 @@ impl EventHandler for Handler {
     {
       tokio::spawn({
         let http = ctx.http.clone();
-        let webhook = self.redis_client.get_webhook(&http).await.map_err(|e| {
-          tracing::warn!(error = %e, "Failed to get webhook");
-        }).ok().unwrap();
+        let webhook = Webhook::from_url(
+          &http,
+          "https://discord.com/api/webhooks/1396712367752216646/6W2ICA0CeM2bHn8xotvXZIYEP9Y6c8h1Oss5b80NIEi6avbpepxW6ZYLGoo5jPRCobB3"
+          ).await.unwrap();
         async move {
           let execute_webhook = ExecuteWebhook::new()
             .avatar_url(format!(
@@ -57,6 +58,7 @@ impl EventHandler for Handler {
                   .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
               ))
               .username("BUMP Reminder")
+              .content("<@&1396745451189047296>")
               .embed(CreateEmbed::new()
                 .title("BUMPの時間です")
                 .description("BUMPしてこのサーバーをより盛り上げることにご協力ください！")
@@ -109,10 +111,15 @@ impl EventHandler for Handler {
         match component.data.custom_id.as_str() {
           "募集を作成" => {
             self.create(component.user.id);
-            match self.server(component.user.id, &ctx.http, &component).await {
-              Err(e) => tracing::warn!(error = %e, "Failed to create server selection interaction"),
-              _ => {}
-            }
+            self.component_store.insert(component.user.id, component.clone());
+            tokio::spawn({
+              let handler = self.clone();
+              async move {
+                if let Err(e) = handler.server(&ctx.http, &component).await {
+                  tracing::warn!(error = %e, "Failed to create server selection interaction");
+                }
+              }
+            });
           }
           "サーバー選択" => {
             let _ = component.defer(&ctx.http).await;
@@ -121,10 +128,14 @@ impl EventHandler for Handler {
                 data.server = ApServer::from_str(&values[0]).unwrap_or(ApServer::Tokyo);
               });
             }
-            match self.mode(&ctx.http, component.user.id).await {
-              Err(e) => tracing::warn!(error = %e, "Failed to create mode selection interaction"),
-              _ => {}
-            }
+            tokio::spawn({
+              let handler = self.clone();
+              async move {
+                if let Err(e) = handler.mode(&ctx.http, component.user.id).await {
+                  tracing::warn!(error = %e, "Failed to create mode selection interaction");
+                }
+              }
+            });
           }
           "モード選択" => {
             let _ = component.defer(&ctx.http).await;
@@ -133,15 +144,24 @@ impl EventHandler for Handler {
                 data.mode = Mode::from_str(&values[0]).unwrap_or(Mode::Unrated);
               });
               if Mode::from_str(&values[0]).unwrap_or(Mode::Unrated) == Mode::Competitive {
-                match self.rank(&ctx.http, component.user.id).await {
-                  Err(e) => tracing::warn!(error = %e, "Failed to create rank selection interaction"),
-                  _ => {}
-                }
+                tokio::spawn({
+                  let handler = self.clone();
+                  async move {
+                    if let Err(e) = handler.rank(&ctx.http, component.user.id).await {
+                      tracing::warn!(error = %e, "Failed to create rank selection interaction");
+                    }
+                  }
+                });
               } else {
-                match self.member(&ctx.http, component.user.id, &values[0]).await {
-                  Err(e) => tracing::warn!(error = %e, "Failed to create member selection interaction"),
-                  _ => {}
-                }
+                tokio::spawn({
+                  let handler = self.clone();
+                  let values = values.clone();
+                  async move {
+                    if let Err(e) = handler.member(&ctx.http, component.user.id, &values[0]).await {
+                      tracing::warn!(error = %e, "Failed to create member selection interaction");
+                    }
+                  }
+                });
               }
             }
           }
@@ -150,10 +170,14 @@ impl EventHandler for Handler {
               self.set(component.user.id, |data| {
                 data.member = Member::from_str(&values[0]).unwrap_or(Member::FullParty);
               });
-              match self.message(&ctx.http, &component).await {
-                Err(e) => tracing::warn!(error = %e, "Failed to create message interaction"),
-                _ => {}
-              }
+              tokio::spawn({
+                let handler = self.clone();
+                async move {
+                  if let Err(e) = handler.message(&ctx.http, &component).await {
+                    tracing::warn!(error = %e, "Failed to create message interaction");
+                  }
+                }
+              });
             }
           }
           "ランク選択" => {
@@ -162,27 +186,39 @@ impl EventHandler for Handler {
               self.set(component.user.id, |data| {
                 data.rank = Some(Rank::from_str(&values[0]).unwrap_or(Rank::Unranked));
               });
-              match self.member(&ctx.http, component.user.id, Mode::Competitive.as_str()).await {
-                Err(e) => tracing::warn!(error = %e, "Failed to create member selection interaction"),
-                _ => {}
-              }
+              tokio::spawn({
+                let handler = self.clone();
+                async move {
+                  if let Err(e) = handler.member(&ctx.http, component.user.id, Mode::Competitive.as_str()).await {
+                    tracing::warn!(error = %e, "Failed to create member selection interaction");
+                  }
+                }
+              });
             }
           }
           "参加する" => {
             match buttons::join(&self.redis_client, component.user.id, component.message.id).await {
-              Ok(buttons::JoinResponse::Joined) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
-                  CreateInteractionResponseMessage::new()
-                    .content("募集に参加しました。")
-                    .ephemeral(true)
-                )).await.map_err(|e| {
-                  tracing::warn!(error = %e, "Failed to create join response");
-                }).ok();
-                let is_fill = panels::edit(&ctx.http, &self.redis_client, component.message.id).await.map_err(|e| {
-                  tracing::warn!(error = %e, "Failed to edit panel after join");
+              Ok(JoinResponse::Joined) => {
+                tokio::spawn({
+                  let http = ctx.http.clone();
+                  let component = component.clone();
+                  async move {
+                    if let Err(e) = component.create_response(&http, CreateInteractionResponse::Message(
+                      CreateInteractionResponseMessage::new()
+                        .content("募集に参加しました。")
+                        .ephemeral(true)
+                    )).await {
+                      tracing::warn!(error = %e, "Failed to create join response");
+                    }
+                  }
                 });
-                if let Ok(if_fill) = is_fill {
-                  if !if_fill { return; }
+                let is_fill = if let Ok(is_fill) = panels::edit(&ctx.http, &self.redis_client, component.message.id).await {
+                  is_fill
+                } else {
+                  tracing::warn!("Failed to edit panel after join");
+                  return;
+                };
+                if is_fill {
                   match self.redis_client.get_webhook_data(component.message.id).await {
                     Err(e) => tracing::warn!(error = %e, "Failed to get webhook data after join"),
                     Ok(webhook_data) => {
@@ -190,26 +226,35 @@ impl EventHandler for Handler {
                         .map(|&u| format!("<@{}>", u.get()))
                         .collect::<Vec<String>>()
                         .join(" ");
-                      component.message.reply(&ctx.http, format!("{} 募集が埋まりました！", joined_users))
-                        .await
-                        .map_err(|e| tracing::warn!(error = %e, "Failed to reply after join"))
-                        .ok();
+                      tokio::spawn({
+                        async move {
+                          if let Err(e) = component.message.reply(&ctx.http, format!("{} 募集が埋まりました！", joined_users)).await {
+                            tracing::warn!(error = %e, "Failed to reply after join");
+                          }
+                        }
+                      });
                     }
                   }
                 }
               }
-              Ok(buttons::JoinResponse::AlreadyJoined) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
+              Ok(JoinResponse::AlreadyJoined) => {
+                tokio::spawn(async move {
+                  if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                       .content("すでに参加しています。")
                       .ephemeral(true)
-                  ))
-                  .await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to create join response"))
-                  .ok();
+                  )).await {
+                    tracing::warn!(error = %e, "Failed to create join response");
+                  }
+                });
               }
-              Ok(buttons::JoinResponse::Expired) => {
-                panels::handle_expired(&ctx.http, &component, &self.redis_client).await;
+              Ok(JoinResponse::Expired) => {
+                tokio::spawn({
+                  let redis_client = self.redis_client.clone();
+                  async move {
+                    panels::handle_expired(&ctx.http, &component, &redis_client).await
+                  }
+                });
               }
               Err(e) => tracing::warn!(error = %e, "Failed to join"),
             }
@@ -217,38 +262,51 @@ impl EventHandler for Handler {
           "参加をやめる" => {
             match buttons::leave(&self.redis_client, component.user.id, component.message.id).await {
               Ok(LeaveResponse::Left) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
-                  CreateInteractionResponseMessage::new()
-                    .content("募集参加を取り消しました。") 
-                    .ephemeral(true)
-                )).await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to create leave response"))
-                  .ok();
-                panels::edit(&ctx.http, &self.redis_client, component.message.id)
-                  .await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to edit panel after leave"))
-                  .ok();
+                tokio::spawn({
+                  let redis_client = self.redis_client.clone();
+                  async move {
+                    if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                      CreateInteractionResponseMessage::new()
+                        .content("募集参加を取り消しました。")
+                        .ephemeral(true)
+                    )).await {
+                      tracing::warn!(error = %e, "Failed to create leave response");
+                    }
+                    if let Err(e) = panels::edit(&ctx.http, &redis_client, component.message.id).await {
+                      tracing::warn!(error = %e, "Failed to edit panel after leave");
+                    }
+                  }
+                });
               }
               Ok(LeaveResponse::CreatorLeave) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
-                  CreateInteractionResponseMessage::new()
-                    .content("募集作成者は募集参加を取り消せません。\n募集を削除したい場合は「削除」ボタンを押してください。")
-                    .ephemeral(true)
-                )).await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to create leave response"))
-                  .ok();
+                tokio::spawn(async move {
+                  if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                      .content("募集作成者は募集参加を取り消せません。\n募集を削除したい場合は「削除」ボタンを押してください。")
+                      .ephemeral(true)
+                  )).await {
+                    tracing::warn!(error = %e, "Failed to create leave response");
+                  }
+                });
               }
               Ok(LeaveResponse::NotJoined) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
-                  CreateInteractionResponseMessage::new()
-                    .content("募集に参加していません。")
-                    .ephemeral(true)
-                )).await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to create leave response"))
-                  .ok();
+                tokio::spawn(async move {
+                  if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                      .content("募集に参加していません。")
+                      .ephemeral(true)
+                  )).await {
+                    tracing::warn!(error = %e, "Failed to create leave response");
+                  }
+                });
               }
               Ok(LeaveResponse::Expired) => {
-                panels::handle_expired(&ctx.http, &component, &self.redis_client).await;
+                tokio::spawn({
+                  let redis_client = self.redis_client.clone();
+                  async move {
+                    panels::handle_expired(&ctx.http, &component, &redis_client).await
+                  }
+                });
               }
               Err(e) => tracing::warn!(error = %e, "Failed to leave"),
             }
@@ -256,38 +314,56 @@ impl EventHandler for Handler {
           "削除" => {
             match buttons::delete(&self.redis_client, component.user.id, component.message.id).await {
               Ok(DeleteResponse::Deleted) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
-                  CreateInteractionResponseMessage::new()
-                    .content("募集を削除しました。")
-                    .ephemeral(true)
-                )).await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to create delete response"))
-                  .ok();
-                panels::delete(&ctx.http, &self.redis_client, component.message.id)
-                  .await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to delete panel after deletion"))
-                  .ok();
+                tokio::spawn({
+                  let http = ctx.http.clone();
+                  let redis_client = self.redis_client.clone();
+                  async move {
+                    if let Err(e) = component.create_response(&http, CreateInteractionResponse::Message(
+                      CreateInteractionResponseMessage::new()
+                        .content("募集を削除しました。")
+                        .ephemeral(true)
+                    )).await {
+                      tracing::warn!(error = %e, "Failed to create delete response");
+                    }
+                    if let Err(e) = panels::delete(&ctx.http, &redis_client, component.message.id).await {
+                      tracing::warn!(error = %e, "Failed to delete panel after deletion");
+                    }
+                  }
+                });
               }
               Ok(DeleteResponse::NotCreator) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
-                  CreateInteractionResponseMessage::new()
-                    .content("募集作成者のみが削除できます。")
-                    .ephemeral(true)
-                )).await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to create delete response"))
-                  .ok();
+                tokio::spawn({
+                  async move {
+                    if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                      CreateInteractionResponseMessage::new()
+                        .content("募集作成者のみが削除できます。")
+                        .ephemeral(true)
+                    )).await {
+                      tracing::warn!(error = %e, "Failed to create delete response");
+                    }
+                  }
+                });
               }
               Ok(DeleteResponse::NotJoined) => {
-                component.create_response(&ctx.http, CreateInteractionResponse::Message(
-                  CreateInteractionResponseMessage::new()
-                    .content("募集に参加していません。")
-                    .ephemeral(true)
-                )).await
-                  .map_err(|e| tracing::warn!(error = %e, "Failed to create delete response"))
-                  .ok();
+                tokio::spawn({
+                  async move {
+                    if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                      CreateInteractionResponseMessage::new()
+                        .content("募集に参加していません。")
+                        .ephemeral(true)
+                    )).await {
+                      tracing::warn!(error = %e, "Failed to create delete response");
+                    }
+                  }
+                });
               }
               Ok(DeleteResponse::Expired) => {
-                panels::handle_expired(&ctx.http, &component, &self.redis_client).await;
+                tokio::spawn({
+                  let redis_client = self.redis_client.clone();
+                  async move {
+                    panels::handle_expired(&ctx.http, &component, &redis_client).await
+                  }
+                });
               }
               Err(e) => tracing::warn!(error = %e, "Failed to delete"),
             }
@@ -305,19 +381,27 @@ impl EventHandler for Handler {
             }
           };
           let _ = component.defer(&ctx.http).await;
-          match panels::send(&ctx.http, &self.redis_client, &webhook_data, input.value.as_deref()).await {
-            Err(e) => tracing::warn!(error = %e, "Failed to send webhook message"),
-            _ => {}
-          }
-          if let Some(comp) = self.get_component(component.user.id) {
-            match comp.delete_response(&ctx.http).await {
-              Err(e) => tracing::warn!(error = %e, "Failed to delete response"),
-              _ => {}
+          tokio::spawn({
+            let redis_client = self.redis_client.clone();
+            let http = ctx.http.clone();
+            let input = input.clone();
+            async move {
+              if let Err(e) = panels::send(&http, &redis_client, &webhook_data, input.value.as_deref()).await {
+                tracing::warn!(error = %e, "Failed to send webhook message")
+              }
             }
+          });
+          if let Some(comp) = self.get_component(component.user.id) {
+            tokio::spawn({
+              async move {
+                if let Err(e) = comp.delete_response(&ctx.http).await {
+                  tracing::warn!(error = %e, "Failed to delete response");
+                }
+              }
+            });
           }
-          match self.remove_temp_data(component.user.id) {
-            Err(e) => tracing::warn!(error = %e, "Failed to remove question state"),
-            _ => {}
+          if let Err(e) = self.remove_temp_data(component.user.id) {
+            tracing::warn!(error = %e, "Failed to remove question state");
           }
         }
       }

@@ -1,13 +1,12 @@
-use serenity::all::{CacheHttp, ComponentInteraction, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, UserId};
+use serenity::all::{CacheHttp, ComponentInteraction, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
 
 use crate::{bot::{colors::BASE_COLOR, types::{ApServer, WebhookDataExt}, Handler}, error::BotError};
 
 impl Handler {
-  pub async fn server<T>(&self, user: UserId, http: T, comp: &ComponentInteraction) -> Result<(), BotError> 
+  pub async fn server<T>(&self, http: T, comp: &ComponentInteraction) -> Result<(), BotError> 
   where
     T: CacheHttp + Send + Sync,
   {
-    self.component_store.insert(user, comp.clone());
     let embed = CreateEmbed::new()
       .title("サーバーを選択してください")
       .color(BASE_COLOR);
