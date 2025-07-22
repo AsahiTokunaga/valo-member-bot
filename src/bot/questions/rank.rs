@@ -29,7 +29,7 @@ impl Handler {
     let response = EditInteractionResponse::new()
       .embed(embed)
       .select_menu(select_menu);
-    if let Some(comp) = &self.component_store.get(&user) {
+    if let Some(comp) = self.component_store.get(&user) {
       comp.edit_response(http, response).await?;
       return Ok(());
     } else {

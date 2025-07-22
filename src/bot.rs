@@ -108,7 +108,7 @@ impl EventHandler for Handler {
       Interaction::Component(component) => {
         match component.data.custom_id.as_str() {
           "募集を作成" => {
-            self.create(component.user.id).await;
+            self.create(component.user.id);
             match self.server(component.user.id, &ctx.http, &component).await {
               Err(e) => tracing::warn!(error = %e, "Failed to create server selection interaction"),
               _ => {}
@@ -119,7 +119,7 @@ impl EventHandler for Handler {
             if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
               self.set(component.user.id, |data| {
                 data.server = ApServer::from_str(&values[0]).unwrap_or(ApServer::Tokyo);
-              }).await;
+              });
             }
             match self.mode(&ctx.http, component.user.id).await {
               Err(e) => tracing::warn!(error = %e, "Failed to create mode selection interaction"),
@@ -131,7 +131,7 @@ impl EventHandler for Handler {
             if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
               self.set(component.user.id, |data| {
                 data.mode = Mode::from_str(&values[0]).unwrap_or(Mode::Unrated);
-              }).await;
+              });
               if Mode::from_str(&values[0]).unwrap_or(Mode::Unrated) == Mode::Competitive {
                 match self.rank(&ctx.http, component.user.id).await {
                   Err(e) => tracing::warn!(error = %e, "Failed to create rank selection interaction"),
@@ -149,7 +149,7 @@ impl EventHandler for Handler {
             if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
               self.set(component.user.id, |data| {
                 data.member = Member::from_str(&values[0]).unwrap_or(Member::FullParty);
-              }).await;
+              });
               match self.message(&ctx.http, &component).await {
                 Err(e) => tracing::warn!(error = %e, "Failed to create message interaction"),
                 _ => {}
@@ -161,7 +161,7 @@ impl EventHandler for Handler {
             if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
               self.set(component.user.id, |data| {
                 data.rank = Some(Rank::from_str(&values[0]).unwrap_or(Rank::Unranked));
-              }).await;
+              });
               match self.member(&ctx.http, component.user.id, Mode::Competitive.as_str()).await {
                 Err(e) => tracing::warn!(error = %e, "Failed to create member selection interaction"),
                 _ => {}
@@ -297,7 +297,7 @@ impl EventHandler for Handler {
       }
       Interaction::Modal(component) => {
         if let ActionRowComponent::InputText(input) = &component.data.components.first().unwrap().components.first().unwrap() {
-          let webhook_data = match self.get_question_state(component.user.id).await {
+          let webhook_data = match self.get_question_state(component.user.id) {
             Ok(data) => data,
             Err(e) => {
               tracing::warn!(error = %e, "Failed to get question state");
@@ -309,13 +309,13 @@ impl EventHandler for Handler {
             Err(e) => tracing::warn!(error = %e, "Failed to send webhook message"),
             _ => {}
           }
-          if let Some(comp) = self.get_component(component.user.id).await {
+          if let Some(comp) = self.get_component(component.user.id) {
             match comp.delete_response(&ctx.http).await {
               Err(e) => tracing::warn!(error = %e, "Failed to delete response"),
               _ => {}
             }
           }
-          match self.remove_temp_data(component.user.id).await {
+          match self.remove_temp_data(component.user.id) {
             Err(e) => tracing::warn!(error = %e, "Failed to remove question state"),
             _ => {}
           }
