@@ -97,11 +97,8 @@ impl EventHandler for Handler {
       }
     };
     if msg.author.id.to_string() != bot {
-      match panels::entry(&ctx.http, &self.redis_client).await {
-        Err(e) => {
-          tracing::warn!(error = %e, "Failed to update entry panel");
-        }
-        _ => {}
+      if let Err(e) = panels::entry(&ctx, &self.redis_client).await {
+        tracing::warn!(error = %e, "Failed to update entry panel");
       }
     }
   }
@@ -380,21 +377,11 @@ impl EventHandler for Handler {
               return;
             }
           };
-          let _ = component.defer(&ctx.http).await;
-          tokio::spawn({
-            let redis_client = self.redis_client.clone();
-            let http = ctx.http.clone();
-            let input = input.clone();
-            async move {
-              if let Err(e) = panels::send(&http, &redis_client, &webhook_data, input.value.as_deref()).await {
-                tracing::warn!(error = %e, "Failed to send webhook message")
-              }
-            }
-          });
           if let Some(comp) = self.get_component(component.user.id) {
             tokio::spawn({
+              let http = ctx.http.clone();
               async move {
-                if let Err(e) = comp.delete_response(&ctx.http).await {
+                if let Err(e) = comp.delete_response(&http).await {
                   tracing::warn!(error = %e, "Failed to delete response");
                 }
               }
@@ -403,6 +390,17 @@ impl EventHandler for Handler {
           if let Err(e) = self.remove_temp_data(component.user.id) {
             tracing::warn!(error = %e, "Failed to remove question state");
           }
+          let _ = component.defer(&ctx.http).await;
+          tokio::spawn({
+            let redis_client = self.redis_client.clone();
+            let http = ctx.http;
+            let input = input.clone();
+            async move {
+              if let Err(e) = panels::send(&http, &redis_client, &webhook_data, input.value.as_deref()).await {
+                tracing::warn!(error = %e, "Failed to send webhook message")
+              }
+            }
+          });
         }
       }
       _ => {}
