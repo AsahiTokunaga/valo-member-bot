@@ -3,6 +3,7 @@ use std::num::ParseIntError;
 use deadpool_redis::PoolError;
 use redis::RedisError;
 use thiserror::Error;
+use tokio::task::JoinError;
 use tracing::subscriber::SetGlobalDefaultError;
 
 #[derive(Debug, Error)]
@@ -17,6 +18,8 @@ pub enum BotError {
   PinMessageError(#[from] ParseIntError),
   #[error("[BotError::TracingError] {0}")]
   TracingError(#[from] SetGlobalDefaultError),
+  #[error("[BotError::JoinError] {0}")]
+  JoinError(#[from] JoinError),
   #[error("[BotError::WebhookDataNotFound] WebhookDataが見つかりません")]
   WebhookDataNotFound,
   #[error("[BotError::ComponentInteractionNotFound] コンポーネントが見つかりません")]

@@ -22,12 +22,20 @@ async fn main() -> Result<(), BotError> {
     .with_timer(JapanStandardTime)
     .init();
   config::load()?;
+  let (tx, mut rx) = worker::Worker::new(1024);
+  tokio::spawn(async move {
+    while let Some(task) = rx.recv().await {
+      task.fut.await;
+    }
+    tracing::info!("Worker receiver closed");
+  });
   let token = config::get("TOKEN")?;
   let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
   let handler = Handler {
     question_state: DashMap::new(),
     component_store: DashMap::new(),
     redis_client: Arc::new(RedisClient::new(&config::get("REDIS_PASS")?).await?),
+    worker: Arc::new(tx),
   };
   let mut client = serenity::Client::builder(token, intents)
     .event_handler_arc(Arc::new(handler))

@@ -12,13 +12,14 @@ use serenity::{
 use std::{str::FromStr, sync::Arc};
 use types::WebhookData;
 
-use crate::{bot::{buttons::{DeleteResponse, JoinResponse, LeaveResponse}, types::{ApServer, Member, Mode, Rank, RedisClient, WebhookDataExt}}, config};
+use crate::{bot::{buttons::{DeleteResponse, JoinResponse, LeaveResponse}, types::{ApServer, Member, Mode, Rank, RedisClient, WebhookDataExt}}, config, worker::Worker};
 
 #[derive(Clone)]
 pub struct Handler {
   pub question_state: DashMap<UserId, WebhookData>,
   pub component_store: DashMap<UserId, ComponentInteraction>,
   pub redis_client: Arc<RedisClient>,
+  pub worker: Arc<Worker>,
 }
 
 #[async_trait]
@@ -27,51 +28,54 @@ impl EventHandler for Handler {
     tracing::info!("{} is ready", ready.user.name);
   }
   async fn message(&self, ctx: Context, msg: Message) {
-    if msg.author.id == UserId::new(302050872383242240)
-      && msg.embeds.get(0).map_or(false, |e| e.description.as_ref().map_or(false, |d| d.contains("表示順をアップしたよ")))
-    {
-      tokio::spawn({
-        let http = ctx.http.clone();
-        let webhook = Webhook::from_url(
-          &http,
-          "https://discord.com/api/webhooks/1396712367752216646/6W2ICA0CeM2bHn8xotvXZIYEP9Y6c8h1Oss5b80NIEi6avbpepxW6ZYLGoo5jPRCobB3"
-          ).await.unwrap();
-        async move {
-          let execute_webhook = ExecuteWebhook::new()
-            .avatar_url(format!(
-              "{}bell-logo.jpg",
-              config::get("BASE_IMG_URL")
-                .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
-            ))
-            .username("BUMP Reminder")
-            .embed(CreateEmbed::new()
-              .title("BUMP通知を検知しました")
-              .description("BUMPありがとう！2時間後にまたBUMPしてね！")
-            );
-          if let Err(e) = webhook.execute(&http, false, execute_webhook).await {
-            tracing::warn!(error = %e, "Failed to send BUMP notification");
-          } else {
-            let execute_webhook = ExecuteWebhook::new()
-              .avatar_url(format!(
-                "{}bell-logo.jpg",
-                config::get("BASE_IMG_URL")
-                  .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
-              ))
-              .username("BUMP Reminder")
-              .content("<@&1396745451189047296>")
-              .embed(CreateEmbed::new()
-                .title("BUMPの時間です")
-                .description("BUMPしてこのサーバーをより盛り上げることにご協力ください！")
-              );
+    if msg.author.id == UserId::new(302050872383242240) && msg.embeds.get(0).map_or(false, |e| e.description.as_ref().map_or(false, |d| d.contains("表示順をアップしたよ"))) {
+      let webhook = Webhook::from_url(&ctx.http, "https://discord.com/api/webhooks/1396712367752216646/6W2ICA0CeM2bHn8xotvXZIYEP9Y6c8h1Oss5b80NIEi6avbpepxW6ZYLGoo5jPRCobB3");
+      let based_webhook = Arc::new(
+        ExecuteWebhook::new()
+          .avatar_url(format!(
+            "{}bell-logo.jpg",
+            config::get("BASE_IMG_URL")
+              .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
+          ))
+          .username("BUMP Reminder")
+      );
+      let detection_bump_webhook = &based_webhook.as_ref().clone()
+        .embed(CreateEmbed::new()
+          .title("BUMP通知を検知しました")
+          .description("BUMPありがとう！2時間後にまたBUMPしてね！")
+        );
+      let reminder_bump_webhook = &based_webhook.as_ref().clone()
+        .content("<@&1396745451189047296>")
+        .embed(CreateEmbed::new()
+          .title("BUMPの時間です")
+          .description("BUMPしてこのサーバーをより盛り上げることにご協力ください！")
+        );
+      
+      if let Ok(webhook) = webhook.await {
+        tokio::spawn({
+          let webhook = webhook.clone();
+          let http = ctx.http.clone();
+          let builder = detection_bump_webhook.clone();
+          async move {
+            if let Err(e) = webhook.execute(&http, false, builder).await {
+              tracing::warn!(error = %e, "Failed to send BUMP notification");
+            }
+          }
+        });
+        tokio::spawn({
+          let webhook = webhook.clone();
+          let http = ctx.http.clone();
+          let builder = reminder_bump_webhook.clone();
+          async move {
             tokio::time::sleep(tokio::time::Duration::from_secs(2 * 60 * 60)).await;
-            if let Err(e) = webhook.execute(&http, false, execute_webhook).await 
-            {
+            if let Err(e) = webhook.execute(&http, false, builder).await {
               tracing::warn!(error = %e, "Failed to send BUMP reminder");
             }
           }
-        }
-      });
+        });
+      }
     }
+
     let channel = match config::get("CHANNEL_ID") {
       Ok(id) => match ChannelId::from_str(&id) {
         Ok(id) => id,
@@ -85,20 +89,26 @@ impl EventHandler for Handler {
         return;
       }
     };
-    if msg.channel_id != channel {
-      return;
-    }
-
-    let bot = match config::get("BOT_ID") {
-      Ok(id) => id,
-      Err(e) => {
-        tracing::warn!(error = %e, "Failed to get BOT_ID from environment variables");
-        return;
-      }
-    };
-    if msg.author.id.to_string() != bot {
-      if let Err(e) = panels::entry(&ctx, &self.redis_client).await {
-        tracing::warn!(error = %e, "Failed to update entry panel");
+    if msg.channel_id == channel {
+      let bot = match config::get("BOT_ID") {
+        Ok(id) => id,
+        Err(e) => {
+          tracing::warn!(error = %e, "Failed to get BOT_ID from environment variables");
+          return;
+        }
+      };
+      if msg.author.id.to_string() != bot {
+        let worker = self.worker.clone();
+        let redis_client = self.redis_client.clone();
+        worker.spawn(move || {
+          let http = ctx.http.clone();
+          let redis_client = redis_client.clone();
+          async move {
+            if let Err(e) = panels::entry(&http, &redis_client).await {
+              tracing::warn!(error = %e, "Failed to create entry panel");
+            }
+          }
+        }).await;
       }
     }
   }
