@@ -30,49 +30,58 @@ impl EventHandler for Handler {
   async fn message(&self, ctx: Context, msg: Message) {
     if msg.author.id == UserId::new(302050872383242240) && msg.embeds.get(0).map_or(false, |e| e.description.as_ref().map_or(false, |d| d.contains("表示順をアップしたよ"))) {
       let webhook = Webhook::from_url(&ctx.http, "https://discord.com/api/webhooks/1396712367752216646/6W2ICA0CeM2bHn8xotvXZIYEP9Y6c8h1Oss5b80NIEi6avbpepxW6ZYLGoo5jPRCobB3");
-      let based_webhook = Arc::new(
-        ExecuteWebhook::new()
-          .avatar_url(format!(
-            "{}bell-logo.jpg",
-            config::get("BASE_IMG_URL")
-              .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
-          ))
-          .username("BUMP Reminder")
-      );
-      let detection_bump_webhook = &based_webhook.as_ref().clone()
+      let based_webhook = ExecuteWebhook::new()
+        .avatar_url(format!(
+          "{}bell-logo.jpg",
+          config::get("BASE_IMG_URL")
+            .unwrap_or("https://raw.githubusercontent.com/AsahiTokunaga/valo-member-bot-images/main/".to_string())
+        ))
+        .username("BUMP Reminder");
+      let detection_bump_webhook = based_webhook
+        .clone()
         .embed(CreateEmbed::new()
           .title("BUMP通知を検知しました")
           .description("BUMPありがとう！2時間後にまたBUMPしてね！")
         );
-      let reminder_bump_webhook = &based_webhook.as_ref().clone()
+      let reminder_bump_webhook = based_webhook
+        .clone()
         .content("<@&1396745451189047296>")
         .embed(CreateEmbed::new()
           .title("BUMPの時間です")
           .description("BUMPしてこのサーバーをより盛り上げることにご協力ください！")
         );
-      
+
       if let Ok(webhook) = webhook.await {
-        tokio::spawn({
-          let webhook = webhook.clone();
-          let http = ctx.http.clone();
-          let builder = detection_bump_webhook.clone();
+        let webhook = Arc::new(webhook);
+        let detection_bump_webhook = Arc::new(detection_bump_webhook);
+        let reminder_bump_webhook = Arc::new(reminder_bump_webhook);
+        let worker = self.worker.clone();
+        let http = ctx.http.clone();
+        worker.spawn(move || {
           async move {
-            if let Err(e) = webhook.execute(&http, false, builder).await {
-              tracing::warn!(error = %e, "Failed to send BUMP notification");
-            }
+            tokio::spawn({
+              let webhook = webhook.clone();
+              let http = http.clone();
+              let detection_bump_webhook = detection_bump_webhook.as_ref().clone().clone();
+              async move {
+                if let Err(e) = webhook.execute(&http, false, detection_bump_webhook).await {
+                  tracing::warn!(error = %e, "Failed to send BUMP notification");
+                }
+              }
+            });
+            tokio::spawn({
+              let webhook = webhook.clone();
+              let http = http.clone();
+              let reminder_bump_webhook = reminder_bump_webhook.as_ref().clone().clone();
+              async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(2 * 60 * 60)).await;
+                if let Err(e) = webhook.execute(&http, false, reminder_bump_webhook).await {
+                  tracing::warn!(error = %e, "Failed to send BUMP reminder");
+                }
+              }
+            });
           }
-        });
-        tokio::spawn({
-          let webhook = webhook.clone();
-          let http = ctx.http.clone();
-          let builder = reminder_bump_webhook.clone();
-          async move {
-            tokio::time::sleep(tokio::time::Duration::from_secs(2 * 60 * 60)).await;
-            if let Err(e) = webhook.execute(&http, false, builder).await {
-              tracing::warn!(error = %e, "Failed to send BUMP reminder");
-            }
-          }
-        });
+        }).await;
       }
     }
 
@@ -99,9 +108,10 @@ impl EventHandler for Handler {
       };
       if msg.author.id.to_string() != bot {
         let worker = self.worker.clone();
-        let redis_client = self.redis_client.clone();
+        let http = ctx.http.clone();
+        let redis_client = Arc::new(self.redis_client.clone());
         worker.spawn(move || {
-          let http = ctx.http.clone();
+          let http = http.clone();
           let redis_client = redis_client.clone();
           async move {
             if let Err(e) = panels::entry(&http, &redis_client).await {
