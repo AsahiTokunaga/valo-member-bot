@@ -1,4 +1,7 @@
-use serenity::all::{CacheHttp, ComponentInteraction, CreateActionRow, CreateInputText, CreateInteractionResponse, CreateModal, Http, InputTextStyle};
+use serenity::all::{
+  CacheHttp, ComponentInteraction, CreateActionRow, CreateInputText, 
+  CreateInteractionResponse, CreateModal, Http, InputTextStyle
+};
 
 use crate::{bot::Handler, error::BotError};
 

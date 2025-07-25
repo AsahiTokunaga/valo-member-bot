@@ -6,13 +6,24 @@ pub mod panels;
 
 use dashmap::DashMap;
 use serenity::{
-  all::{ActionRowComponent, ChannelId, ComponentInteraction, ComponentInteractionDataKind, Context, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, EventHandler, ExecuteWebhook, Interaction, Message, Ready, UserId, Webhook},
+  all::{
+    ActionRowComponent, ChannelId, ComponentInteraction, ComponentInteractionDataKind, 
+    Context, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, 
+    EventHandler, ExecuteWebhook, Interaction, Message, Ready, UserId, Webhook
+  },
   async_trait,
 };
 use std::{str::FromStr, sync::Arc};
 use types::WebhookData;
 
-use crate::{bot::{buttons::{DeleteResponse, JoinResponse, LeaveResponse}, types::{ApServer, Member, Mode, Rank, RedisClient, WebhookDataExt}}, config, worker::Worker};
+use crate::{
+  bot::{
+    buttons::{DeleteResponse, JoinResponse, LeaveResponse}, 
+    types::{ApServer, Member, Mode, Rank, RedisClient, WebhookDataExt}
+  },
+  config, 
+  worker::Worker
+};
 
 #[derive(Clone)]
 pub struct Handler {

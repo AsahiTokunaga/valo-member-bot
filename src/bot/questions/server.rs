@@ -1,4 +1,7 @@
-use serenity::all::{CacheHttp, ComponentInteraction, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
+use serenity::all::{
+  CacheHttp, ComponentInteraction, CreateEmbed, CreateInteractionResponse, CreateSelectMenu,
+  CreateInteractionResponseMessage, CreateSelectMenuKind, CreateSelectMenuOption
+};
 
 use crate::{bot::{colors::BASE_COLOR, types::{ApServer, WebhookDataExt}, Handler}, error::BotError};
 

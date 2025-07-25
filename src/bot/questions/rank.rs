@@ -1,6 +1,16 @@
-use serenity::all::{CacheHttp, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, EditInteractionResponse, Http, UserId};
+use serenity::all::{
+  CacheHttp, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind,
+  CreateSelectMenuOption, EditInteractionResponse, Http, UserId
+};
 
-use crate::{bot::{colors::BASE_COLOR, types::{Rank, WebhookDataExt}, Handler}, error::BotError};
+use crate::{
+  bot::{
+    colors::BASE_COLOR,
+    types::{Rank, WebhookDataExt},
+    Handler
+  },
+  error::BotError
+};
 
 impl Handler {
   pub async fn rank<T>(&self, http: T, user: UserId) -> Result<(), BotError> 

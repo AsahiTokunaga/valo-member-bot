@@ -1,12 +1,10 @@
-use serenity::all::{
-  CacheHttp, CreateEmbed, ExecuteWebhook, Http,
-};
+use serenity::all::{CacheHttp, CreateEmbed, ExecuteWebhook, Http};
 
 use crate::{
   bot::{
-    colors::BASE_COLOR, panels::{get_button, get_thumbnail}, types::{
-      RedisClient, WebhookData, WebhookDataExt
-    }
+    colors::BASE_COLOR,
+    panels::{get_button, get_thumbnail},
+    types::{RedisClient, WebhookData, WebhookDataExt}
   },
   error::BotError
 };

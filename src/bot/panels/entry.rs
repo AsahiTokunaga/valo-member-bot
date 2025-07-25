@@ -1,9 +1,15 @@
 use std::{str::FromStr, sync::Arc};
 
 use redis::AsyncTypedCommands;
-use serenity::all::{ButtonStyle, CacheHttp, ChannelId, CreateActionRow, CreateButton, CreateEmbed, CreateMessage, GetMessages, Http, MessageId};
+use serenity::all::{
+  ButtonStyle, CacheHttp, ChannelId, CreateActionRow, CreateButton,
+  CreateEmbed, CreateMessage, GetMessages, Http, MessageId
+};
 
-use crate::{bot::{colors::PIN_MESSAGE_COLOR, types::RedisClient}, config, error::{BotError, DbError}};
+use crate::{
+  bot::{colors::PIN_MESSAGE_COLOR, types::RedisClient},
+  config, error::{BotError, DbError}
+};
 
 pub async fn entry(http: &Arc<Http>, redis_client: &RedisClient) -> Result<(), BotError> {
   if !is_updatable(http, redis_client).await? { return Ok(()); }
