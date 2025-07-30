@@ -1,18 +1,18 @@
-use serenity::all::{
-  CacheHttp, CreateEmbed, ExecuteWebhook, Http,
-};
+use std::sync::Arc;
+
+use serenity::all::{CreateEmbed, ExecuteWebhook, Http};
 
 use crate::{
   bot::{
-    colors::BASE_COLOR, panels::{get_button, get_thumbnail}, types::{
-      RedisClient, WebhookData, WebhookDataExt
-    }
+    colors::BASE_COLOR,
+    panels::{get_button, get_thumbnail},
+    types::{RedisClient, WebhookData, WebhookDataExt}
   },
   error::BotError
 };
 
-pub async fn send<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut RedisClient, webhook_data: &WebhookData, cont: Option<&str>) -> Result<(), BotError> {
-  let webhook = redis_client.get_webhook(http);
+pub async fn send(http: Arc<Http>, redis_client: Arc<RedisClient>, webhook_data: Arc<WebhookData>, cont: Option<&str>) -> Result<(), BotError> {
+  let webhook = redis_client.get_webhook(http.clone());
   let joined_users: String = webhook_data.joined
     .iter()
     .map(|&u| format!("<@{}>", u.get()))
@@ -31,20 +31,23 @@ pub async fn send<T: AsRef<Http> + CacheHttp + Copy>(http: T, redis_client: &mut
     .thumbnail(thumbail)
     .field("参加者", joined_users, false);
   let buttons = get_button(false);
-  let creator = webhook_data.creator.to_user(http).await?;
-  let mut webhook_message = ExecuteWebhook::new()
+
+  let creator = webhook_data.creator.to_user(http.clone()).await?;
+  let webhook_message = ExecuteWebhook::new()
     .username(creator.display_name())
     .avatar_url(creator.face())
     .embed(embed)
+    .content(cont.map_or(format!("{}", webhook_data.mode.to_mention_str()), |f| format!("{} {}", webhook_data.mode.to_mention_str(), f)))
     .components(vec![buttons]);
-  if let Some(content) = cont {
-    webhook_message = webhook_message.content(content);
-  }
 
   // 第2引数がtrueのため必ずSomeを返す
   // 詳細: https://docs.rs/serenity/latest/serenity/http/struct.Http.html#method.execute_webhook
   // Webhook::execute() -> ExecuteWebhook::execute() -> Http::execute_webhook()のラッパー
-  let message = webhook.await?.execute(http, true, webhook_message).await?.unwrap();
-  redis_client.store_webhook_data(message.id, webhook_data).await?;
+  let message = webhook.await?.execute(http.clone(), true, webhook_message).await?.unwrap();
+  tokio::spawn(async move {
+    if let Err(e) = redis_client.store_webhook_data(message.id, webhook_data).await {
+      tracing::warn!(error = %e, "Failed to store webhook data in Redis");
+    }
+  });
   Ok(())
 }

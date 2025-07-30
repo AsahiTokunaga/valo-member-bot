@@ -1,14 +1,14 @@
-use redis::{aio::ConnectionManager, AsyncTypedCommands, Client};
-use serenity::all::{Builder, CacheHttp, ChannelId, CreateWebhook, Http, MessageId, UserId, Webhook};
-use tokio::sync::Mutex;
-use std::{str::FromStr, sync::Arc};
-use crate::{bot::colors::*, config, error::BotError};
+use deadpool_redis::{Config, Pool, Runtime};
+use redis::AsyncTypedCommands;
+use serenity::all::{Builder, ChannelId, CreateWebhook, Http, MessageId, UserId, Webhook};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
+use crate::{bot::colors::*, config, error::{BotError, DbError}};
 
 const THREE_DAYS_SECONDS: i64 = 3 * 24 * 60 * 60;
 
 #[derive(Clone)]
 pub struct RedisClient {
-  pub connection: Arc<Mutex<ConnectionManager>>,
+  pub connection: Pool,
 }
 
 pub trait WebhookDataExt: Sized {
@@ -85,35 +85,41 @@ impl WebhookData {
 
 impl RedisClient {
   pub async fn new(redis_pass: &str) -> Result<Self, BotError> {
-    let client = Client::open(format!("redis://:{}@127.0.0.1/", redis_pass))?;
-    let conn = ConnectionManager::new(client).await?;
+    let cfg = Config::from_url(format!("redis://:{}@127.0.0.1/", redis_pass));
+    let pool = cfg.create_pool(Some(Runtime::Tokio1)).unwrap();
     Ok(Self {
-      connection: Arc::new(Mutex::new(conn)),
+      connection: pool,
     })
   }
-  pub async fn store_webhook_data(&self, id: MessageId, data: &WebhookData) -> Result<(), BotError> {
+  pub async fn store_webhook_data(&self, id: MessageId, data: Arc<WebhookData>) -> Result<(), BotError> {
     let creator = data.creator.get().to_string();
     let joined_user: String = data.joined.iter()
       .map(|u| format!("{}", u.get()))
       .collect::<Vec<String>>()
       .join(",");
-    let fields_value = [
-      ("creator", creator.as_str()),
-      ("server", data.server.as_str()),
-      ("mode", data.mode.as_str()),
-      ("rank", data.rank.map_or("None", |r| r.as_str())),
-      ("member", data.member.as_str()),
-      ("joined", joined_user.as_str()),
+    let fields_value: [(&str, String); 6] = [
+      ("creator", creator),
+      ("server", data.server.as_str().to_string()),
+      ("mode", data.mode.as_str().to_string()),
+      ("rank", data.rank.map_or("None".to_string(), |r| r.as_str().to_string())),
+      ("member", data.member.as_str().to_string()),
+      ("joined", joined_user.as_str().to_string()),
     ];
-    let mut conn = self.connection.lock().await;
-    conn.hset_multiple(id.get(), &fields_value).await?;
-    conn.expire(id.get(), THREE_DAYS_SECONDS).await?;
-    drop(conn);
+    let conn = self.connection.get().await.map_err(DbError::from)?;
+    tokio::spawn(async move {
+      let mut conn = conn;
+      if let Err(e) = conn.hset_multiple(id.get(), &fields_value).await {
+        tracing::error!(error = %e, "Failed to store webhook data");
+      }
+      if let Err(e) = conn.expire(id.get(), THREE_DAYS_SECONDS).await {
+        tracing::error!(error = %e, "Failed to set expiration for webhook data");
+      }
+    });
     Ok(())
   }
   pub async fn get_webhook_data(&self, id: MessageId) -> Result<WebhookData, BotError> {
-    let mut conn = self.connection.lock().await;
-    let hash_set = conn.hgetall(id.get()).await?;
+    let mut conn = self.connection.get().await.map_err(DbError::from)?;
+    let hash_set: HashMap<String, String> = conn.hgetall(id.get()).await.map_err(DbError::from)?;
     drop(conn);
     let creator = UserId::from_str(hash_set.get("creator").ok_or(BotError::WebhookDataNotFound)?)
       .map_err(|_| BotError::WebhookDataNotFound)?;
@@ -142,21 +148,24 @@ impl RedisClient {
     };
     Ok(webhook_data)
   }
-  pub async fn get_webhook<T: AsRef<Http> + CacheHttp + Copy>(&self, http: T) -> Result<Webhook, BotError> {
+  pub async fn get_webhook(&self, http: Arc<Http>) -> Result<Webhook, BotError> {
     let channel = ChannelId::from_str(&config::get("CHANNEL_ID")?)?;
-    let mut conn = self.connection.lock().await;
-    let webhook_url = conn.get("webhook_url").await?;
+    let mut conn = self.connection.get().await.map_err(DbError::from)?;
+    let webhook_url: Option<String> = conn.get("webhook_url").await.map_err(DbError::from)?;
     match webhook_url {
       Some(url) => {
-        drop(conn);
         let webhook = Webhook::from_url(http, &url).await?;
         Ok(webhook)
       }
       None => {
         let webhook = CreateWebhook::new("Valo Member Bot Webhook")
           .execute(http, channel).await?;
-        conn.set("webhook_url", webhook.url()?).await?;
-        drop(conn);
+        tokio::spawn(async move {
+          let mut conn = conn;
+          if let Err(e) = conn.set("webhook_url", &webhook_url).await {
+            tracing::warn!(error = %e, "Failed to store webhook URL in Redis");
+          }
+        });
         Ok(webhook)
       }
     }
@@ -211,6 +220,15 @@ impl FromStr for Mode {
     Self::variants()
       .find(|&mode| mode.as_str() == s)
       .ok_or("Invalid mode")
+  }
+}
+impl Mode {
+  pub fn to_mention_str(&self) -> String {
+    match self {
+      Mode::Unrated => format!("<@&{}>", config::get("UNRATED_MENTION_ID").unwrap_or_default()),
+      Mode::Competitive => format!("<@&{}>", config::get("COMPETITIVE_MENTION_ID").unwrap_or_default()),
+      Mode::Custom => format!("<@&{}>", config::get("CUSTOM_MENTION_ID").unwrap_or_default()),
+    }
   }
 }
 

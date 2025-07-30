@@ -1,12 +1,14 @@
-use serenity::all::{CacheHttp, ComponentInteraction, CreateActionRow, CreateInputText, CreateInteractionResponse, CreateModal, Http, InputTextStyle};
+use std::sync::Arc;
+
+use serenity::all::{
+  ComponentInteraction, CreateActionRow, CreateInputText, 
+  CreateInteractionResponse, CreateModal, Http, InputTextStyle
+};
 
 use crate::{bot::Handler, error::BotError};
 
 impl Handler {
-  pub async fn message<T>(&self, http: T, comp: &ComponentInteraction) -> Result<(), BotError> 
-  where 
-    T: AsRef<Http> + CacheHttp + Copy,
-  {
+  pub async fn message(&self, http: Arc<Http>, comp: &ComponentInteraction) -> Result<(), BotError> {
     let action_row = vec![
       CreateActionRow::InputText(
         CreateInputText::new(

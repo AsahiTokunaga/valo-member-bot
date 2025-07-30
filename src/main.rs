@@ -1,13 +1,14 @@
 mod bot;
 mod config;
 mod error;
+mod worker;
 
-use std::{collections::HashMap,sync::Arc};
+use std::sync::Arc;
 
+use dashmap::DashMap;
 use error::BotError;
 use bot::Handler;
 use serenity::all::GatewayIntents;
-use tokio::sync::Mutex;
 use tracing::{Level, instrument};
 use tracing_subscriber::fmt::time::FormatTime;
 
@@ -16,18 +17,25 @@ use crate::bot::types::RedisClient;
 #[tokio::main(flavor = "multi_thread")]
 #[instrument(name = "main", err)]
 async fn main() -> Result<(), BotError> {
-  let logger = tracing_subscriber::fmt::Subscriber::builder()
+  tracing_subscriber::fmt()
     .with_max_level(Level::INFO)
     .with_timer(JapanStandardTime)
-    .finish();
-  tracing::subscriber::set_global_default(logger)?;
+    .init();
   config::load()?;
+  let (tx, mut rx) = worker::Worker::new(1024);
+  tokio::spawn(async move {
+    while let Some(task) = rx.recv().await {
+      task.fut.await;
+    }
+    tracing::info!("Worker receiver closed");
+  });
   let token = config::get("TOKEN")?;
   let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
   let handler = Handler {
-    question_state: Arc::new(Mutex::new(HashMap::new())),
-    component_store: Arc::new(Mutex::new(HashMap::new())),
-    redis_client: Arc::new(Mutex::new(RedisClient::new(&config::get("REDIS_PASS")?).await?)),
+    question_state: DashMap::new(),
+    component_store: DashMap::new(),
+    redis_client: Arc::new(RedisClient::new(&config::get("REDIS_PASS")?).await?),
+    worker: Arc::new(tx),
   };
   let mut client = serenity::Client::builder(token, intents)
     .event_handler_arc(Arc::new(handler))

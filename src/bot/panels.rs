@@ -1,4 +1,9 @@
-use serenity::all::{ButtonStyle, CreateActionRow, CreateButton, ReactionType};
+use std::sync::Arc;
+
+use serenity::all::{
+  ButtonStyle, ComponentInteraction, CreateActionRow, CreateButton, ReactionType,
+  CreateInteractionResponse, CreateInteractionResponseMessage, Http
+};
 
 mod send;
 mod edit;
@@ -10,7 +15,7 @@ pub use send::send;
 pub use edit::edit;
 pub use delete::delete;
 
-use crate::{bot::types::Rank, config, error::BotError};
+use crate::{bot::types::{Rank, RedisClient}, config, error::BotError};
 
 pub fn get_button(join_disable: bool) -> CreateActionRow {
   let buttons = vec![
@@ -44,6 +49,21 @@ pub fn get_thumbnail(rank: Option<Rank>) -> Result<String, BotError> {
     Some(Rank::Silver) => Ok(format!("{}silver.png", base_url)),
     Some(Rank::Bronze) => Ok(format!("{}bronze.png", base_url)),
     Some(Rank::Iron) => Ok(format!("{}iron.png", base_url)),
+    Some(Rank::Unranked) => Ok(format!("{}unranked.png", base_url)),
     _ => Ok(format!("{}unrated.png", base_url)),
   }
+}
+
+pub async fn handle_expired(http: Arc<Http>, component: Arc<ComponentInteraction>, redis_client: Arc<RedisClient>) {
+  component.create_response(http.clone(), CreateInteractionResponse::Message(
+    CreateInteractionResponseMessage::new()
+      .content("期限切れの募集のため削除します。")
+      .ephemeral(true)
+    ))
+    .await
+    .map_err(|e| tracing::warn!(error = %e, "Failed to create join response"))
+    .ok();
+  self::delete(http.clone(), redis_client, component.message.id).await
+    .map_err(|e| tracing::warn!(error = %e, "Failed to delete expired panel"))
+    .ok();
 }

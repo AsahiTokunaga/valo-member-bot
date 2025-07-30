@@ -4,52 +4,43 @@ mod mode;
 mod rank;
 mod server;
 
+use std::sync::Arc;
+
 use crate::{
-  bot::{types::{RedisClient, WebhookData}, Handler},
+  bot::{types::WebhookData, Handler},
   error::BotError,
 };
 use serenity::all::{ComponentInteraction, UserId};
 
 // 質問フロー内でデータ作成、編集等に使用するメソッドを実装
 impl Handler {
-  pub async fn create(&self, id: UserId) {
-    let mut lock = self.question_state.lock().await;
+  pub fn create(&self, id: UserId) {
     let data = WebhookData::new(id);
-    lock.insert(id, data);
+    self.question_state.insert(id, data);
   }
-  pub async fn set<F: FnMut(&mut WebhookData)>(&self, id: UserId, mut f: F) {
-    let mut lock = self.question_state.lock().await;
-    if let Some(data) = lock.get_mut(&id) {
-      f(data);
+  pub fn set<F: FnMut(&mut WebhookData)>(&self, id: UserId, mut f: F) {
+    if let Some(mut data) = self.question_state.get_mut(&id) {
+      f(&mut data);
     } else {
       tracing::warn!("No data found for user: {}", id);
     }
   }
-  pub async fn get_question_state(&self, id: UserId) -> Result<WebhookData, BotError> {
-    let lock = self.question_state.lock().await;
-    if let Some(data) = lock.get(&id) {
+  pub fn get_question_state(&self, id: UserId) -> Result<WebhookData, BotError> {
+    if let Some(data) = self.question_state.get(&id) {
       Ok(data.clone())
     } else {
       Err(BotError::WebhookDataNotFound)
     }
   }
-  pub async fn get_component(&self, id: UserId) -> Option<ComponentInteraction> {
-    let lock = self.component_store.lock().await;
-    lock.get(&id).cloned()
+  pub fn get_component(&self, id: UserId) -> Option<Arc<ComponentInteraction>> {
+    self.component_store.get(&id)
+      .map(|comp| comp.clone())
   }
-  pub async fn get_redis_client(&self) -> RedisClient {
-    let lock = self.redis_client.lock().await;
-    lock.clone()
-  }
-  pub async fn remove_temp_data(&self, id: UserId) -> Result<(), BotError> {
-    let mut lock = self.question_state.lock().await;
-    if lock.remove(&id).is_none() {
-      drop(lock);
+  pub fn remove_temp_data(&self, id: UserId) -> Result<(), BotError> {
+    if self.question_state.remove(&id).is_none() {
       return Err(BotError::WebhookDataNotFound);
     }
-    let mut lock = self.component_store.lock().await;
-    if lock.remove(&id).is_none() {
-      drop(lock);
+    if self.component_store.remove(&id).is_none() {
       return Err(BotError::ComponentInteractionNotFound);
     }
     Ok(())

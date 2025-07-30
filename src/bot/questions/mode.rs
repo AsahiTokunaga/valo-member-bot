@@ -1,12 +1,21 @@
-use serenity::all::{CacheHttp, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, EditInteractionResponse, Http, UserId};
+use std::sync::Arc;
 
-use crate::{bot::{colors::BASE_COLOR, types::{Mode, WebhookDataExt}, Handler}, error::BotError};
+use serenity::all::{
+  CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, UserId,
+  CreateSelectMenuOption, EditInteractionResponse, Http
+};
+
+use crate::{
+  bot::{
+    colors::BASE_COLOR,
+    types::{Mode, WebhookDataExt},
+    Handler
+  },
+  error::BotError
+};
 
 impl Handler {
-  pub async fn mode<T>(&self, http: T, user: UserId) -> Result<(), BotError>
-  where
-    T: AsRef<Http> + CacheHttp + Copy,
-  {
+  pub async fn mode(&self, http: Arc<Http>, user: UserId) -> Result<(), BotError> {
     let embed = CreateEmbed::new()
       .title("モードを選択してください")
       .color(BASE_COLOR);
@@ -22,10 +31,8 @@ impl Handler {
     let response = EditInteractionResponse::new()
       .embed(embed)
       .select_menu(select_menu);
-    let component_store = self.component_store.lock().await;
-    if let Some(comp) = component_store.get(&user) {
+    if let Some(comp) = self.component_store.get(&user) {
       comp.edit_response(http, response).await?;
-      drop(component_store);
       Ok(())
     } else {
       Err(BotError::ComponentInteractionNotFound)
