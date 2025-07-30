@@ -1,15 +1,14 @@
+use std::sync::Arc;
+
 use serenity::all::{
-  CacheHttp, ComponentInteraction, CreateEmbed, CreateInteractionResponse, CreateSelectMenu,
-  CreateInteractionResponseMessage, CreateSelectMenuKind, CreateSelectMenuOption
+  ComponentInteraction, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
+  CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, Http
 };
 
 use crate::{bot::{colors::BASE_COLOR, types::{ApServer, WebhookDataExt}, Handler}, error::BotError};
 
 impl Handler {
-  pub async fn server<T>(&self, http: T, comp: &ComponentInteraction) -> Result<(), BotError> 
-  where
-    T: CacheHttp + Send + Sync,
-  {
+  pub async fn server(&self, http: Arc<Http>, comp: Arc<ComponentInteraction>) -> Result<(), BotError> {
     let embed = CreateEmbed::new()
       .title("サーバーを選択してください")
       .color(BASE_COLOR);
@@ -30,7 +29,13 @@ impl Handler {
         .select_menu(select_menu)
         .ephemeral(true)
     );
-    comp.create_response(http, response).await?;
+    tokio::spawn({
+      async move {
+        if let Err(e) = comp.create_response(http, response).await {
+          tracing::error!("Failed to create server selection response: {}", e);
+        }
+      }
+    });
     Ok(())
   }
 }

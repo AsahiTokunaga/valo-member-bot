@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use redis::AsyncTypedCommands;
 use serenity::all::{MessageId, UserId};
 
@@ -10,7 +12,7 @@ pub enum DeleteResponse {
   Expired,
 }
 
-pub async fn delete(redis_client: &RedisClient, delete_user: UserId, message: MessageId) -> Result<DeleteResponse, BotError> {
+pub async fn delete(redis_client: Arc<RedisClient>, delete_user: UserId, message: MessageId) -> Result<DeleteResponse, BotError> {
   let webhook_data = match redis_client.get_webhook_data(message).await {
         Ok(data) => data,
         Err(_) => return Ok(DeleteResponse::Expired),
@@ -22,8 +24,12 @@ pub async fn delete(redis_client: &RedisClient, delete_user: UserId, message: Me
     return Ok(DeleteResponse::NotJoined);
   } else {
     let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
-    conn.del(message.get()).await.map_err(DbError::from)?;
-    drop(conn);
+    tokio::spawn(async move {
+      if let Err(e) = conn.del(message.get()).await {
+        tracing::warn!(error = %e, "Failed to delete data from Redis");
+      }
+      drop(conn);
+    });
     Ok(DeleteResponse::Deleted)
   }
 }

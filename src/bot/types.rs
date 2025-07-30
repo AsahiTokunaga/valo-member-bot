@@ -1,7 +1,7 @@
 use deadpool_redis::{Config, Pool, Runtime};
 use redis::AsyncTypedCommands;
-use serenity::all::{Builder, CacheHttp, ChannelId, CreateWebhook, Http, MessageId, UserId, Webhook};
-use std::{collections::HashMap, str::FromStr};
+use serenity::all::{Builder, ChannelId, CreateWebhook, Http, MessageId, UserId, Webhook};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use crate::{bot::colors::*, config, error::{BotError, DbError}};
 
 const THREE_DAYS_SECONDS: i64 = 3 * 24 * 60 * 60;
@@ -91,7 +91,7 @@ impl RedisClient {
       connection: pool,
     })
   }
-  pub async fn store_webhook_data(&self, id: MessageId, data: &WebhookData) -> Result<(), BotError> {
+  pub async fn store_webhook_data(&self, id: MessageId, data: Arc<WebhookData>) -> Result<(), BotError> {
     let creator = data.creator.get().to_string();
     let joined_user: String = data.joined.iter()
       .map(|u| format!("{}", u.get()))
@@ -148,7 +148,7 @@ impl RedisClient {
     };
     Ok(webhook_data)
   }
-  pub async fn get_webhook<T: AsRef<Http> + CacheHttp + Copy>(&self, http: T) -> Result<Webhook, BotError> {
+  pub async fn get_webhook(&self, http: Arc<Http>) -> Result<Webhook, BotError> {
     let channel = ChannelId::from_str(&config::get("CHANNEL_ID")?)?;
     let mut conn = self.connection.get().await.map_err(DbError::from)?;
     let webhook_url: Option<String> = conn.get("webhook_url").await.map_err(DbError::from)?;

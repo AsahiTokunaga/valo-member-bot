@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use redis::AsyncTypedCommands;
 use serenity::all::{MessageId, UserId};
 use crate::{bot::types::RedisClient, error::{BotError, DbError}};
@@ -8,7 +10,7 @@ pub enum JoinResponse {
     Expired,
 }
 
-pub async fn join(redis_client: &RedisClient, join_user: UserId, message: MessageId) -> Result<JoinResponse, BotError> {
+pub async fn join(redis_client: Arc<RedisClient>, join_user: UserId, message: MessageId) -> Result<JoinResponse, BotError> {
   let webhook_data = match redis_client.get_webhook_data(message).await {
         Ok(data) => data,
         Err(_) => return Ok(JoinResponse::Expired),
@@ -23,8 +25,12 @@ pub async fn join(redis_client: &RedisClient, join_user: UserId, message: Messag
       .collect::<Vec<String>>()
       .join(",");
     let mut conn = redis_client.connection.get().await.map_err(DbError::from)?;
-    conn.hset(message.get(), "joined", joined_string).await.map_err(DbError::from)?;
-    drop(conn);
+    tokio::spawn(async move {
+      if let Err(e) = conn.hset(message.get(), "joined", joined_string).await {
+        tracing::warn!(error = %e, "Failed to update joined users in Redis");
+      }
+      drop(conn);
+    });
     Ok(JoinResponse::Joined)
   }
 }

@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use serenity::all::{
-  CacheHttp, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, 
-  CreateSelectMenuOption, EditInteractionResponse, Http, UserId
+  CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, UserId,
+  CreateSelectMenuOption, EditInteractionResponse, Http
 };
 
 use crate::{
@@ -13,10 +15,7 @@ use crate::{
 };
 
 impl Handler {
-  pub async fn mode<T>(&self, http: T, user: UserId) -> Result<(), BotError>
-  where
-    T: AsRef<Http> + CacheHttp + Copy,
-  {
+  pub async fn mode(&self, http: Arc<Http>, user: UserId) -> Result<(), BotError> {
     let embed = CreateEmbed::new()
       .title("モードを選択してください")
       .color(BASE_COLOR);

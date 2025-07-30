@@ -4,6 +4,8 @@ mod mode;
 mod rank;
 mod server;
 
+use std::sync::Arc;
+
 use crate::{
   bot::{types::WebhookData, Handler},
   error::BotError,
@@ -30,7 +32,7 @@ impl Handler {
       Err(BotError::WebhookDataNotFound)
     }
   }
-  pub fn get_component(&self, id: UserId) -> Option<ComponentInteraction> {
+  pub fn get_component(&self, id: UserId) -> Option<Arc<ComponentInteraction>> {
     self.component_store.get(&id)
       .map(|comp| comp.clone())
   }
