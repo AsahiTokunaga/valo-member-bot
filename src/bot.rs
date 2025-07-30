@@ -66,33 +66,28 @@ impl EventHandler for Handler {
         let webhook = Arc::new(webhook);
         let detection_bump_webhook = Arc::new(detection_bump_webhook);
         let reminder_bump_webhook = Arc::new(reminder_bump_webhook);
-        let worker = self.worker.clone();
         let http = ctx.http.clone();
-        worker.spawn(move || {
+        tokio::spawn({
+          let webhook = webhook.clone();
+          let http = http.clone();
+          let detection_bump_webhook = detection_bump_webhook.as_ref().clone().clone();
           async move {
-            tokio::spawn({
-              let webhook = webhook.clone();
-              let http = http.clone();
-              let detection_bump_webhook = detection_bump_webhook.as_ref().clone().clone();
-              async move {
-                if let Err(e) = webhook.execute(http, false, detection_bump_webhook).await {
-                  tracing::warn!(error = %e, "Failed to send BUMP notification");
-                }
-              }
-            });
-            tokio::spawn({
-              let webhook = webhook.clone();
-              let http = http.clone();
-              let reminder_bump_webhook = reminder_bump_webhook.as_ref().clone().clone();
-              async move {
-                tokio::time::sleep(tokio::time::Duration::from_secs(2 * 60 * 60)).await;
-                if let Err(e) = webhook.execute(http, false, reminder_bump_webhook).await {
-                  tracing::warn!(error = %e, "Failed to send BUMP reminder");
-                }
-              }
-            });
+            if let Err(e) = webhook.execute(http, false, detection_bump_webhook).await {
+              tracing::warn!(error = %e, "Failed to send BUMP notification");
+            }
           }
-        }).await;
+        });
+        tokio::spawn({
+          let webhook = webhook.clone();
+          let http = http.clone();
+          let reminder_bump_webhook = reminder_bump_webhook.as_ref().clone().clone();
+          async move {
+            tokio::time::sleep(tokio::time::Duration::from_secs(2 * 60 * 60)).await;
+            if let Err(e) = webhook.execute(http, false, reminder_bump_webhook).await {
+              tracing::warn!(error = %e, "Failed to send BUMP reminder");
+            }
+          }
+        });
       }
     }
 
@@ -150,7 +145,7 @@ impl EventHandler for Handler {
             });
           }
           "サーバー選択" => {
-            let _ = component.defer(&ctx.http).await;
+            let _ = component.defer(ctx.http.clone()).await;
             if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
               self.set(component.user.id, |data| {
                 data.server = ApServer::from_str(&values[0]).unwrap_or(ApServer::Tokyo);
@@ -166,7 +161,7 @@ impl EventHandler for Handler {
             });
           }
           "モード選択" => {
-            let _ = component.defer(&ctx.http).await;
+            let _ = component.defer(ctx.http.clone()).await;
             if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
               self.set(component.user.id, |data| {
                 data.mode = Mode::from_str(&values[0]).unwrap_or(Mode::Unrated);
@@ -209,7 +204,7 @@ impl EventHandler for Handler {
             }
           }
           "ランク選択" => {
-            let _ = component.defer(&ctx.http).await;
+            let _ = component.defer(ctx.http.clone()).await;
             if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
               self.set(component.user.id, |data| {
                 data.rank = Some(Rank::from_str(&values[0]).unwrap_or(Rank::Unranked));
@@ -282,7 +277,7 @@ impl EventHandler for Handler {
               }
               Ok(JoinResponse::AlreadyJoined) => {
                 tokio::spawn(async move {
-                  if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                  if let Err(e) = component.create_response(ctx.http, CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                       .content("すでに参加しています。")
                       .ephemeral(true)
@@ -331,7 +326,7 @@ impl EventHandler for Handler {
               }
               Ok(LeaveResponse::CreatorLeave) => {
                 tokio::spawn(async move {
-                  if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                  if let Err(e) = component.create_response(ctx.http, CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                       .content("募集作成者は募集参加を取り消せません。\n募集を削除したい場合は「削除」ボタンを押してください。")
                       .ephemeral(true)
@@ -342,7 +337,7 @@ impl EventHandler for Handler {
               }
               Ok(LeaveResponse::NotJoined) => {
                 tokio::spawn(async move {
-                  if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                  if let Err(e) = component.create_response(ctx.http, CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                       .content("募集に参加していません。")
                       .ephemeral(true)
@@ -384,7 +379,7 @@ impl EventHandler for Handler {
               Ok(DeleteResponse::NotCreator) => {
                 tokio::spawn({
                   async move {
-                    if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                    if let Err(e) = component.create_response(ctx.http, CreateInteractionResponse::Message(
                       CreateInteractionResponseMessage::new()
                         .content("募集作成者のみが削除できます。")
                         .ephemeral(true)
@@ -397,7 +392,7 @@ impl EventHandler for Handler {
               Ok(DeleteResponse::NotJoined) => {
                 tokio::spawn({
                   async move {
-                    if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                    if let Err(e) = component.create_response(ctx.http, CreateInteractionResponse::Message(
                       CreateInteractionResponseMessage::new()
                         .content("募集に参加していません。")
                         .ephemeral(true)
@@ -443,7 +438,7 @@ impl EventHandler for Handler {
           if let Err(e) = self.remove_temp_data(component.user.id) {
             tracing::warn!(error = %e, "Failed to remove question state");
           }
-          let _ = component.defer(&ctx.http).await;
+          let _ = component.defer(ctx.http.clone()).await;
           tokio::spawn({
             let redis_client = self.redis_client.clone();
             let webhook_data = Arc::new(webhook_data);
